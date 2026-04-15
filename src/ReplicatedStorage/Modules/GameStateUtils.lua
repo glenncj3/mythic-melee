@@ -196,4 +196,46 @@ function GameStateUtils.drawCards(gameState, playerID, count)
 	end
 end
 
+-- Count cards of a specific faction a player controls (across all locations)
+function GameStateUtils.countFactionCards(gameState, playerID, faction, excludeCol, excludeRow, excludeLocIdx)
+	local CardDatabase = require(script.Parent.CardDatabase)
+	local count = 0
+	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
+		for row = 1, GameConfig.GRID_ROWS do
+			for col = 1, GameConfig.GRID_COLUMNS do
+				if not (col == excludeCol and row == excludeRow and locIdx == excludeLocIdx) then
+					local card = GameStateUtils.getCard(gameState, playerID, locIdx, col, row)
+					if card then
+						local def = CardDatabase[card.cardID]
+						if def and def.faction == faction then
+							count = count + 1
+						end
+					end
+				end
+			end
+		end
+	end
+	return count
+end
+
+-- Get all friendly cards of a specific faction at a location (excluding a specific slot)
+function GameStateUtils.getFactionCardsAt(gameState, playerID, locIdx, faction, excludeCol, excludeRow)
+	local CardDatabase = require(script.Parent.CardDatabase)
+	local cards = {}
+	for row = 1, GameConfig.GRID_ROWS do
+		for col = 1, GameConfig.GRID_COLUMNS do
+			if not (col == excludeCol and row == excludeRow) then
+				local card = GameStateUtils.getCard(gameState, playerID, locIdx, col, row)
+				if card then
+					local def = CardDatabase[card.cardID]
+					if def and def.faction == faction then
+						table.insert(cards, { card = card, col = col, row = row, locIdx = locIdx })
+					end
+				end
+			end
+		end
+	end
+	return cards
+end
+
 return GameStateUtils

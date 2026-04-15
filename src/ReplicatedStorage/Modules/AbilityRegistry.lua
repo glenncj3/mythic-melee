@@ -93,6 +93,27 @@ onRevealResolvers["AddPower"] = function(gameState, sourceCard, playerID, locIdx
 	elseif target == "Self" then
 		GSU.addModifier(sourceCard, sourceName, amount, false)
 		print(string.format("  [Ability] %s: +%d Power to self", sourceCard.cardID, amount))
+
+	elseif string.find(target, "^Faction_") then
+		-- OnReveal:AddPower:Faction_X:N — buff all faction X cards at this location
+		local faction = string.sub(target, 9)  -- strip "Faction_"
+		local factionCards = GSU.getFactionCardsAt(gameState, playerID, locIdx, faction, col, row)
+		for _, entry in ipairs(factionCards) do
+			GSU.addModifier(entry.card, sourceName, amount, false)
+			print(string.format("  [Ability] %s: +%d Power to %s (%s) at (%d,%d)",
+				sourceCard.cardID, amount, entry.card.cardID, faction, entry.col, entry.row))
+		end
+
+	elseif string.find(target, "^PerFaction_") then
+		-- OnReveal:AddPower:PerFaction_X:N — +N to self per faction X card you control
+		local faction = string.sub(target, 12)  -- strip "PerFaction_"
+		local count = GSU.countFactionCards(gameState, playerID, faction, col, row, locIdx)
+		local totalBonus = count * amount
+		if totalBonus > 0 then
+			GSU.addModifier(sourceCard, sourceName, totalBonus, false)
+			print(string.format("  [Ability] %s: %d %s cards, +%d Power to self",
+				sourceCard.cardID, count, faction, totalBonus))
+		end
 	end
 end
 
@@ -432,6 +453,17 @@ ongoingResolvers["AddPower"] = function(gameState, sourceCard, playerID, locIdx,
 
 	elseif target == "Self" and params[2] == "PerOngoing" then
 		-- Sage: handled by AddPower_PerOngoing below
+
+	elseif string.find(target, "^Faction_") then
+		-- Ongoing:AddPower:Faction_X:N — buff all faction X cards at all locations
+		local faction = string.sub(target, 9)  -- strip "Faction_"
+		for li = 1, GameConfig.LOCATIONS_PER_GAME do
+			local factionCards = GSU.getFactionCardsAt(gameState, playerID, li, faction,
+				(li == locIdx) and col or nil, (li == locIdx) and row or nil)
+			for _, entry in ipairs(factionCards) do
+				GSU.addModifier(entry.card, sourceName, amount, false)
+			end
+		end
 	end
 end
 

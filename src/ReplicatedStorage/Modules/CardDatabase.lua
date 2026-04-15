@@ -9,7 +9,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(255, 200, 60),
 	},
 	SCOUT = {
@@ -19,7 +19,7 @@ local CardDatabase = {
 		ability = "OnReveal:DrawCard:1",
 		abilityText = "On Reveal: Draw a card.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(100, 200, 100),
 	},
 	SEEDLING = {
@@ -29,7 +29,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:Adjacent:1",
 		abilityText = "Ongoing: +1 Power to adjacent cards.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Wild",
 		artColor = Color3.fromRGB(80, 180, 80),
 	},
 	EMBER = {
@@ -39,7 +39,7 @@ local CardDatabase = {
 		ability = "OnReveal:RemovePower:Random_Friendly_Here:1",
 		abilityText = "On Reveal: -1 Power to a random friendly card at this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(255, 100, 50),
 	},
 	SAGE = {
@@ -49,7 +49,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:Self:PerOngoing",
 		abilityText = "Ongoing: +1 Power for each other Ongoing card you control (at any location).",
 		rarity = "Uncommon",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(160, 120, 220),
 	},
 
@@ -63,7 +63,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(150, 150, 160),
 	},
 	FROST_SPRITE = {
@@ -73,7 +73,7 @@ local CardDatabase = {
 		ability = "OnReveal:RemovePower:Random_Enemy_Here:2",
 		abilityText = "On Reveal: -2 Power to a random enemy card at this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(130, 200, 255),
 	},
 	LOOKOUT = {
@@ -83,7 +83,7 @@ local CardDatabase = {
 		ability = "OnReveal:ConditionalPower:Opponent_Played_Here:3",
 		abilityText = "On Reveal: If your opponent played a card at this location this turn, +3 Power to this card.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(200, 180, 100),
 	},
 	FLAME_IMP = {
@@ -93,7 +93,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:Adjacent:1",
 		abilityText = "Ongoing: +1 Power to adjacent cards.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(255, 80, 30),
 	},
 	MYSTIC = {
@@ -103,7 +103,7 @@ local CardDatabase = {
 		ability = "OnReveal:AddPower:Column:1",
 		abilityText = "On Reveal: +1 Power to all friendly cards in the same column at this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(100, 80, 200),
 	},
 
@@ -117,7 +117,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(140, 130, 120),
 	},
 	HEALER = {
@@ -127,7 +127,7 @@ local CardDatabase = {
 		ability = "OnReveal:AddPower:Location:1",
 		abilityText = "On Reveal: +1 Power to all other friendly cards at this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Wild",
 		artColor = Color3.fromRGB(255, 255, 200),
 	},
 	WIND_DANCER = {
@@ -137,7 +137,7 @@ local CardDatabase = {
 		ability = "OnReveal:MoveThis:OtherLocation",
 		abilityText = "On Reveal: Move this card to a random empty slot at the other location.",
 		rarity = "Uncommon",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(180, 230, 255),
 	},
 	SABOTEUR = {
@@ -147,7 +147,7 @@ local CardDatabase = {
 		ability = "OnReveal:RemovePower:All_Enemy_Here:1",
 		abilityText = "On Reveal: -1 Power to all enemy cards at this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(100, 60, 100),
 	},
 	ECHO = {
@@ -157,7 +157,7 @@ local CardDatabase = {
 		ability = "OnReveal:SummonCopy:Adjacent:1",
 		abilityText = "On Reveal: Summon a 1-Power copy of this card in a random empty adjacent slot.",
 		rarity = "Uncommon",
-		faction = nil,
+		faction = "Wild",
 		artColor = Color3.fromRGB(200, 200, 255),
 	},
 
@@ -171,7 +171,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(180, 60, 60),
 	},
 	COMMANDER = {
@@ -181,7 +181,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:Location:1",
 		abilityText = "Ongoing: +1 Power to all other friendly cards at this location.",
 		rarity = "Uncommon",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(220, 180, 60),
 	},
 	TRICKSTER = {
@@ -191,7 +191,7 @@ local CardDatabase = {
 		ability = "OnReveal:SetPower:Highest_Enemy_Here",
 		abilityText = "On Reveal: Set this card's Power equal to the highest-Power enemy card at this location.",
 		rarity = "Rare",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(100, 200, 180),
 	},
 	SHIELD_WALL = {
@@ -201,7 +201,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:Row:2",
 		abilityText = "Ongoing: +2 Power to all other friendly cards in the same row as this card.",
 		rarity = "Uncommon",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(80, 120, 200),
 	},
 	BERSERKER = {
@@ -211,7 +211,7 @@ local CardDatabase = {
 		ability = "OnReveal:ConditionalPower:Empty_Slots_Here:1",
 		abilityText = "On Reveal: +1 Power for each empty slot on your side of this location.",
 		rarity = "Common",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(200, 50, 50),
 	},
 
@@ -225,7 +225,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Rare",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(200, 30, 30),
 	},
 	STORM_MAGE = {
@@ -235,7 +235,7 @@ local CardDatabase = {
 		ability = "OnReveal:RemovePower:All_Enemy_Here:2",
 		abilityText = "On Reveal: -2 Power to all enemy cards at this location.",
 		rarity = "Rare",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(60, 60, 180),
 	},
 	WARLORD = {
@@ -245,7 +245,7 @@ local CardDatabase = {
 		ability = "Ongoing:DoublePower:Location",
 		abilityText = "Ongoing: Double your total Power at this location (applied after all other modifiers).",
 		rarity = "Legendary",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(180, 0, 0),
 	},
 	HIGH_PRIESTESS = {
@@ -255,7 +255,7 @@ local CardDatabase = {
 		ability = "OnReveal:DrawCard:2",
 		abilityText = "On Reveal: Draw 2 cards.",
 		rarity = "Rare",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(255, 220, 255),
 	},
 
@@ -269,7 +269,7 @@ local CardDatabase = {
 		ability = nil,
 		abilityText = nil,
 		rarity = "Rare",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(100, 100, 100),
 	},
 	OVERLORD = {
@@ -279,7 +279,7 @@ local CardDatabase = {
 		ability = "Ongoing:AddPower:AllLocations:1",
 		abilityText = "Ongoing: +1 Power to all your other cards at both locations.",
 		rarity = "Legendary",
-		faction = nil,
+		faction = "Arcane",
 		artColor = Color3.fromRGB(60, 0, 60),
 	},
 	VOID_WALKER = {
@@ -289,7 +289,7 @@ local CardDatabase = {
 		ability = "OnReveal:DestroyBelow:2:Here_Both",
 		abilityText = "On Reveal: Destroy all cards with 2 or less Power at this location (both sides).",
 		rarity = "Legendary",
-		faction = nil,
+		faction = "Shadow",
 		artColor = Color3.fromRGB(30, 0, 50),
 	},
 	COLOSSUS = {
@@ -299,7 +299,7 @@ local CardDatabase = {
 		ability = "Ongoing:Immune",
 		abilityText = "Ongoing: This card's Power cannot be reduced by enemy abilities.",
 		rarity = "Rare",
-		faction = nil,
+		faction = "Iron",
 		artColor = Color3.fromRGB(180, 160, 140),
 	},
 }
