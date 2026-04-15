@@ -523,26 +523,6 @@ local function createMatchUI()
 	boardFrame.ZIndex = 2
 	boardFrame.Parent = bg
 
-	-- Board outer glow border
-	local boardGlowFrame = Instance.new("Frame")
-	boardGlowFrame.Name = "BoardGlow"
-	boardGlowFrame.Size = UDim2.new(1, 8, 1, 8)
-	boardGlowFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	boardGlowFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	boardGlowFrame.BackgroundTransparency = 1
-	boardGlowFrame.BorderSizePixel = 0
-	boardGlowFrame.Parent = boardFrame
-
-	local boardGlowCorner = Instance.new("UICorner")
-	boardGlowCorner.CornerRadius = UDim.new(0, 12)
-	boardGlowCorner.Parent = boardGlowFrame
-
-	local boardGlowStroke = Instance.new("UIStroke")
-	boardGlowStroke.Color = COLORS.panelGlow
-	boardGlowStroke.Thickness = 2
-	boardGlowStroke.Transparency = 0.3
-	boardGlowStroke.Parent = boardGlowFrame
-
 	local boardLayout = Instance.new("UIListLayout")
 	boardLayout.FillDirection = Enum.FillDirection.Horizontal
 	boardLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -574,11 +554,10 @@ local function createMatchUI()
 	shelfHighlight.ZIndex = 3
 	shelfHighlight.Parent = bottomFrame
 
-	-- Control row (energy, timer, confirm) — proportional height
+	-- Control row (energy, timer, confirm)
 	local controlRow = Instance.new("Frame")
 	controlRow.Name = "ControlRow"
-	controlRow.Size = UDim2.new(1, 0, 0.055, 0)
-	controlRow.SizeConstraint = Enum.SizeConstraint.RelativeXY
+	controlRow.Size = UDim2.new(1, 0, 0, 48)
 	controlRow.Position = UDim2.new(0, 0, 0, 4)
 	controlRow.BackgroundTransparency = 1
 	controlRow.ZIndex = 3
@@ -735,8 +714,7 @@ local function createMatchUI()
 	handFrame.Name = "HandArea"
 	handFrame.Size = UDim2.new(0.94, 0, 0, 157)
 	handFrame.Position = UDim2.new(0.03, 0, 0, 52)
-	handFrame.BackgroundColor3 = Color3.fromRGB(14, 16, 24)
-	handFrame.BackgroundTransparency = 0.5
+	handFrame.BackgroundTransparency = 1
 	handFrame.BorderSizePixel = 0
 	handFrame.ScrollBarThickness = 4
 	handFrame.ScrollBarImageColor3 = COLORS.textGray
@@ -1503,10 +1481,10 @@ local function renderHand()
 		if cardF then
 			cardF.LayoutOrder = i
 
-			-- Unaffordable cards: dim + desaturate tint (Phase 1E)
+			-- Unaffordable cards: dim (Phase 1E)
 			if not canAfford then
-				cardF.BackgroundTransparency = 0.5
-				cardF.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+				cardF.BackgroundTransparency = 0.4
+				cardF.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 			end
 
 			cardF.Parent = handFrame

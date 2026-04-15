@@ -109,7 +109,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		-- Board cards: no fixed size, they inherit slot dimensions
 		frame.Size = UDim2.new(1, 0, 1, 0)
 	end
-	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+	frame.BackgroundColor3 = Color3.fromRGB(40, 42, 55)
 	frame.BorderSizePixel = 0
 
 	-- Rarity border (UIStroke)
@@ -198,14 +198,14 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		costLabel.Parent = costBadge
 	end
 
-	-- Power badge (bottom-right) — sized as 26% of card width
+	-- Power badge (top-right) — sized as 26% of card width
 	if fonts.power > 0 then
 		local powerBadge = Instance.new("Frame")
 		powerBadge.Name = "PowerBadge"
 		powerBadge.Size = UDim2.new(0.26, 0, 0.26, 0)
 		powerBadge.SizeConstraint = Enum.SizeConstraint.RelativeXX
-		powerBadge.AnchorPoint = Vector2.new(1, 1)
-		powerBadge.Position = UDim2.new(1, -4, 1, -4)
+		powerBadge.AnchorPoint = Vector2.new(1, 0)
+		powerBadge.Position = UDim2.new(1, -4, 0, 4)
 		powerBadge.BackgroundColor3 = Color3.fromRGB(200, 160, 40)
 		powerBadge.BorderSizePixel = 0
 		powerBadge.ZIndex = 2
@@ -233,7 +233,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		powerLabel.Parent = powerBadge
 	end
 
-	-- Ability type indicator pip (top-right)
+	-- Ability type indicator pip (below art, right side)
 	if def.ability then
 		local parsed = string.split(def.ability, ":")
 		local trigger = parsed[1]
@@ -244,7 +244,9 @@ function CardFrame.create(cardID, displaySize, overridePower)
 			pip.Name = "AbilityPip"
 			pip.Size = UDim2.new(0, pipSize, 0, pipSize)
 			pip.AnchorPoint = Vector2.new(1, 0)
-			pip.Position = UDim2.new(1, -4, 0, 4)
+			-- Position just below the art area, right-aligned
+			local artBottom = displaySize == "board" and 0.62 or (displaySize == "hand" and 0.52 or 0.47)
+			pip.Position = UDim2.new(0.92, 0, artBottom, 2)
 			pip.BackgroundColor3 = pipColor
 			pip.BorderSizePixel = 0
 			pip.ZIndex = 4
