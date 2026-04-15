@@ -784,6 +784,20 @@ function AbilityRegistry.isEndOfTurn(abilityString)
 	return false
 end
 
+-- Check if a resolver exists for a given trigger and effect name
+function AbilityRegistry.hasResolver(trigger, effect)
+	if trigger == "OnReveal" then
+		return onRevealResolvers[effect] ~= nil
+	elseif trigger == "Ongoing" then
+		return ongoingResolvers[effect] ~= nil or effect == "AddPower"  -- AddPower_PerOngoing special case
+	elseif trigger == "OnDestroy" then
+		return onDestroyResolvers[effect] ~= nil
+	elseif trigger == "EndOfTurn" then
+		return endOfTurnResolvers[effect] ~= nil
+	end
+	return false
+end
+
 -- Resolve all OnDestroy sub-abilities for a card being destroyed
 function AbilityRegistry.resolveOnDestroy(gameState, sourceCard, playerID, locIdx, col, row)
 	local CardDatabase = require(script.Parent.CardDatabase)

@@ -218,4 +218,60 @@ function LocationDatabase.printAll()
 	end
 end
 
+-- Validate all location entries: checks required fields and effect parsing
+function LocationDatabase.validate()
+	local errors = {}
+	local validTriggers = {
+		OnPlay = true, StartOfTurn = true, EndOfTurn = true,
+		Restrict = true, SuppressOnReveal = true,
+	}
+
+	for _, id in ipairs(LocationDatabase.getAllIDs()) do
+		local loc = LocationDatabase[id]
+
+		-- Check required fields
+		if not loc.name then table.insert(errors, id .. ": missing name") end
+		if not loc.pointValue or loc.pointValue < 1 then
+			table.insert(errors, id .. ": invalid pointValue " .. tostring(loc.pointValue))
+		end
+
+		-- Check effect string parses correctly
+		if loc.effect then
+			local segments = string.split(loc.effect, "|")
+			for _, segment in ipairs(segments) do
+				local parts = string.split(segment, ":")
+				if #parts < 1 then
+					table.insert(errors, id .. ": empty effect segment")
+				else
+					local trigger = parts[1]
+					-- SuppressOnReveal is a standalone keyword
+					if trigger == "SuppressOnReveal" then
+						-- valid
+					elseif not validTriggers[trigger] then
+						table.insert(errors, id .. ": unknown trigger '" .. trigger .. "' in " .. segment)
+					elseif #parts < 2 and trigger ~= "SuppressOnReveal" then
+						table.insert(errors, id .. ": effect missing name in " .. segment)
+					end
+				end
+			end
+
+			-- Effect text should exist if effect exists
+			if not loc.effectText then
+				table.insert(errors, id .. ": has effect but no effectText")
+			end
+		end
+	end
+
+	if #errors > 0 then
+		print("=== LocationDatabase Validation FAILED (" .. #errors .. " errors) ===")
+		for _, err in ipairs(errors) do
+			print("  ERROR: " .. err)
+		end
+	else
+		print("=== LocationDatabase Validation PASSED (" .. #LocationDatabase.getAllIDs() .. " locations) ===")
+	end
+
+	return #errors == 0, errors
+end
+
 return LocationDatabase

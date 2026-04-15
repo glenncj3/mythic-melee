@@ -609,4 +609,55 @@ function CardDatabase.printByCost(cost)
 	end
 end
 
+-- Validate all card entries: checks required fields, ability parsing, and resolver existence
+function CardDatabase.validate()
+	local AbilityRegistry = require(script.Parent.AbilityRegistry)
+	local errors = {}
+
+	for _, id in ipairs(CardDatabase.getAllIDs()) do
+		local card = CardDatabase[id]
+
+		-- Check required fields
+		if not card.name then table.insert(errors, id .. ": missing name") end
+		if not card.cost or card.cost < 0 or card.cost > 10 then
+			table.insert(errors, id .. ": invalid cost " .. tostring(card.cost))
+		end
+		if not card.power and card.power ~= 0 then
+			table.insert(errors, id .. ": missing power")
+		end
+		if not card.rarity then table.insert(errors, id .. ": missing rarity") end
+		if not card.faction then table.insert(errors, id .. ": missing faction") end
+		if not card.artColor then table.insert(errors, id .. ": missing artColor") end
+
+		-- Check ability resolves
+		if card.ability then
+			local subs = string.split(card.ability, "|")
+			for _, sub in ipairs(subs) do
+				local parsed = AbilityRegistry.parse(sub)
+				if not parsed then
+					table.insert(errors, id .. ": ability parse failed: " .. sub)
+				elseif not AbilityRegistry.hasResolver(parsed.trigger, parsed.effect) then
+					table.insert(errors, id .. ": no resolver for " .. parsed.trigger .. ":" .. parsed.effect)
+				end
+			end
+		end
+
+		-- Ability text should exist if ability exists
+		if card.ability and not card.abilityText then
+			table.insert(errors, id .. ": has ability but no abilityText")
+		end
+	end
+
+	if #errors > 0 then
+		print("=== CardDatabase Validation FAILED (" .. #errors .. " errors) ===")
+		for _, err in ipairs(errors) do
+			print("  ERROR: " .. err)
+		end
+	else
+		print("=== CardDatabase Validation PASSED (" .. #CardDatabase.getAllIDs() .. " cards) ===")
+	end
+
+	return #errors == 0, errors
+end
+
 return CardDatabase
