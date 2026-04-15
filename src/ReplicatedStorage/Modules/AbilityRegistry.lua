@@ -278,6 +278,106 @@ onRevealResolvers["SummonCopy"] = function(gameState, sourceCard, playerID, locI
 	end
 end
 
+-- OnReveal:Bounce:Target — return a card to its owner's hand
+onRevealResolvers["Bounce"] = function(gameState, sourceCard, playerID, locIdx, col, row, params)
+	local target = params[1]
+
+	if target == "Random_Enemy_Here" then
+		local enemies = GSU.getEnemyCardsAt(gameState, playerID, locIdx)
+		local pick = GSU.pickRandom(enemies)
+		if pick then
+			local opponent = GSU.getOpponent(gameState, playerID)
+			local oppPlayer = gameState.players[opponent]
+			if #oppPlayer.hand < GameConfig.MAX_HAND_SIZE then
+				table.insert(oppPlayer.hand, pick.card.cardID)
+				GSU.setCard(gameState, opponent, locIdx, pick.col, pick.row, nil)
+				print(string.format("  [Ability] %s: bounced enemy %s back to hand",
+					sourceCard.cardID, pick.card.cardID))
+			else
+				print(string.format("  [Ability] %s: enemy hand full, bounce failed", sourceCard.cardID))
+			end
+		end
+
+	elseif target == "Weakest_Friendly_Here" then
+		local friendlies = GSU.getFriendlyCardsAt(gameState, playerID, locIdx, col, row)
+		if #friendlies > 0 then
+			table.sort(friendlies, function(a, b)
+				return GSU.getCurrentPower(a.card) < GSU.getCurrentPower(b.card)
+			end)
+			local weakest = friendlies[1]
+			local player = gameState.players[playerID]
+			if #player.hand < GameConfig.MAX_HAND_SIZE then
+				table.insert(player.hand, weakest.card.cardID)
+				GSU.setCard(gameState, playerID, locIdx, weakest.col, weakest.row, nil)
+				print(string.format("  [Ability] %s: bounced friendly %s back to hand",
+					sourceCard.cardID, weakest.card.cardID))
+			end
+		end
+	end
+end
+
+-- OnReveal:AddPowerAll:Amount — +N to ALL your cards at ALL locations
+onRevealResolvers["AddPowerAll"] = function(gameState, sourceCard, playerID, _locIdx, _col, _row, params)
+	local amount = tonumber(params[1]) or 0
+	local sourceName = sourceCard.cardID .. "_ONREVEAL"
+	local count = 0
+	for li = 1, GameConfig.LOCATIONS_PER_GAME do
+		for r = 1, GameConfig.GRID_ROWS do
+			for c = 1, GameConfig.GRID_COLUMNS do
+				local card = GSU.getCard(gameState, playerID, li, c, r)
+				if card and card ~= sourceCard then
+					GSU.addModifier(card, sourceName, amount, false)
+					count = count + 1
+				end
+			end
+		end
+	end
+	print(string.format("  [Ability] %s: +%d Power to %d cards across all locations",
+		sourceCard.cardID, amount, count))
+end
+
+-- OnReveal:FillLocation:TokenPower — fill all empty friendly slots with tokens
+onRevealResolvers["FillLocation"] = function(gameState, sourceCard, playerID, locIdx, _col, _row, params)
+	local tokenPower = tonumber(params[1]) or 1
+	local emptySlots = GSU.getEmptySlots(gameState, playerID, locIdx)
+	for _, slot in ipairs(emptySlots) do
+		local token = {
+			cardID = sourceCard.cardID .. "_TOKEN",
+			basePower = tokenPower,
+			powerModifiers = {},
+			currentPower = tokenPower,
+			isToken = true,
+			isImmune = false,
+			turnPlayed = gameState.turn,
+			playOrder = 999,
+		}
+		GSU.setCard(gameState, playerID, locIdx, slot.col, slot.row, token)
+	end
+	print(string.format("  [Ability] %s: filled %d empty slots with %d-Power tokens",
+		sourceCard.cardID, #emptySlots, tokenPower))
+end
+
+-- OnReveal:SwapPower:Target — swap this card's power with a target
+onRevealResolvers["SwapPower"] = function(gameState, sourceCard, playerID, locIdx, _col, _row, params)
+	local target = params[1]
+
+	if target == "Random_Enemy_Here" then
+		local enemies = GSU.getEnemyCardsAt(gameState, playerID, locIdx)
+		local pick = GSU.pickRandom(enemies)
+		if pick then
+			local myPower = GSU.getCurrentPower(sourceCard)
+			local theirPower = GSU.getCurrentPower(pick.card)
+			local myDiff = theirPower - sourceCard.basePower
+			local theirDiff = myPower - pick.card.basePower
+			-- Clear existing modifiers and set new ones to achieve the swap
+			sourceCard.powerModifiers = {{ source = sourceCard.cardID .. "_SWAP", amount = myDiff }}
+			pick.card.powerModifiers = {{ source = sourceCard.cardID .. "_SWAP", amount = theirDiff }}
+			print(string.format("  [Ability] %s: swapped power with %s (%d <-> %d)",
+				sourceCard.cardID, pick.card.cardID, myPower, theirPower))
+		end
+	end
+end
+
 -- ============================================================
 -- Ongoing resolvers (called during recalculation sweep)
 -- ============================================================
@@ -351,6 +451,15 @@ end
 
 -- Ongoing:Immune (Colossus)
 ongoingResolvers["Immune"] = function(_gameState, sourceCard, _playerID, _locIdx, _col, _row, _params)
+	sourceCard.isImmune = true
+end
+
+-- Ongoing:NoPowerReduction:Location — all friendly cards at this location are immune to enemy debuffs
+ongoingResolvers["NoPowerReduction"] = function(gameState, sourceCard, playerID, locIdx, col, row, _params)
+	local friendlies = GSU.getFriendlyCardsAt(gameState, playerID, locIdx, col, row)
+	for _, entry in ipairs(friendlies) do
+		entry.card.isImmune = true
+	end
 	sourceCard.isImmune = true
 end
 

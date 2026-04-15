@@ -819,6 +819,7 @@ function MatchManager:resolveEndOfTurn()
 
 	print("[Match] --- Resolving End-of-Turn abilities ---")
 
+	-- Card EndOfTurn abilities
 	for pid, player in pairs(gs.players) do
 		for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
 			for row = 1, GameConfig.GRID_ROWS do
@@ -833,6 +834,12 @@ function MatchManager:resolveEndOfTurn()
 				end
 			end
 		end
+	end
+
+	-- Location EndOfTurn effects
+	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
+		local location = gs.locations[locIdx]
+		LocationEffectRegistry.applyEndOfTurn(location, locIdx, gs)
 	end
 
 	-- Recalculate power after EndOfTurn modifications
