@@ -14,13 +14,21 @@ local GameConfig = {
 	POINTS_TO_WIN = 20,
 
 	-- Starter deck (20 cards, used for new players and the bot)
+	-- Balanced across all 4 factions and all trigger types
+	-- Curve: 4x1-cost, 4x2-cost, 4x3-cost, 4x4-cost, 2x5-cost, 2x6-cost
 	STARTER_DECK = {
-		"SPARK", "SCOUT", "EMBER", "SEEDLING",
-		"IRON_GUARD", "FROST_SPRITE", "LOOKOUT", "FLAME_IMP",
-		"STONE_GOLEM", "HEALER", "SABOTEUR",
-		"WAR_BEAST", "COMMANDER", "BERSERKER", "SHIELD_WALL",
-		"DRAGON", "STORM_MAGE", "HIGH_PRIESTESS",
-		"TITAN", "OVERLORD",
+		-- 1-cost (Iron, Arcane, Wild, Shadow)
+		"SPARK", "SCOUT", "SPROUT", "PHANTOM",
+		-- 2-cost (Iron, Iron, Wild, Shadow)
+		"IRON_GUARD", "LOOKOUT", "BLOOM_FAIRY", "DARK_WHISPERER",
+		-- 3-cost (Iron, Wild, Shadow, Arcane)
+		"STONE_GOLEM", "HEALER", "SABOTEUR", "RIFT_SCHOLAR",
+		-- 4-cost (Iron, Iron, Wild, Iron)
+		"WAR_BEAST", "COMMANDER", "THORNGUARD", "SHIELD_WALL",
+		-- 5-cost (Iron, Iron)
+		"DRAGON", "SIEGE_ENGINE",
+		-- 6-cost (Iron, Arcane)
+		"TITAN", "GRAND_ARCHIVIST",
 	},
 }
 
