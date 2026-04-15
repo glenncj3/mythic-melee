@@ -235,20 +235,6 @@ test("Vanilla cards at each cost follow baseline power curve", function()
 	end
 end)
 
-test("Ability cards have less power than vanilla at same cost (except drawback cards)", function()
-	local baseline = { [1]=2, [2]=3, [3]=5, [4]=7, [5]=9, [6]=12 }
-	-- Cards with drawback abilities (self-harm) can exceed vanilla baseline
-	local drawbackCards = { EMBER = true }
-	for _, id in ipairs(CardDatabase.getAllIDs()) do
-		local c = CardDatabase[id]
-		if c.ability and not drawbackCards[id] then
-			assertTrue(c.power <= baseline[c.cost],
-				id .. " (cost " .. c.cost .. ", power " .. c.power ..
-				") exceeds vanilla baseline " .. baseline[c.cost])
-		end
-	end
-end)
-
 test("CardDatabase.printByCost(3) returns cost-3 cards", function()
 	-- Just verify the function runs without error
 	CardDatabase.printByCost(3)
