@@ -26,6 +26,7 @@ local GameConfig = require(Modules:WaitForChild("GameConfig"))
 local CardDatabase = require(Modules:WaitForChild("CardDatabase"))
 local CardFrame = require(Modules:WaitForChild("CardFrame"))
 local SlotGrid = require(Modules:WaitForChild("SlotGrid"))
+local LocationRestrictions = require(Modules:WaitForChild("LocationRestrictions"))
 
 -- Remote Events
 local TurnStartEvent = Events:WaitForChild("TurnStart")
@@ -141,6 +142,31 @@ local function playTween(key, instance, tweenInfo, properties)
 	activeTweens[key] = tween
 	tween:Play()
 	return tween
+end
+
+-- Pulse a single property between two values in a loop.
+-- Runs in a spawned thread; stops when the instance loses its Parent
+-- or the optional guardFn returns false.
+local function pulseProperty(instance, property, lowVal, highVal, duration, guardFn)
+	task.spawn(function()
+		while instance and instance.Parent do
+			if guardFn and not guardFn() then break end
+			local tweenA = TweenService:Create(instance,
+				TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{ [property] = highVal }
+			)
+			tweenA:Play()
+			tweenA.Completed:Wait()
+			if not instance or not instance.Parent then break end
+			if guardFn and not guardFn() then break end
+			local tweenB = TweenService:Create(instance,
+				TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{ [property] = lowVal }
+			)
+			tweenB:Play()
+			tweenB.Completed:Wait()
+		end
+	end)
 end
 
 -- ============================================================
@@ -1329,23 +1355,7 @@ local function renderCardInSlot(slotFrame, cardID, power, basePower, isPending)
 			end
 
 			-- Pending card pulsing transparency (Phase 3B)
-			task.spawn(function()
-				while cardF and cardF.Parent do
-					local pulseIn = TweenService:Create(cardF,
-						TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-						{ BackgroundTransparency = 0.45 }
-					)
-					pulseIn:Play()
-					pulseIn.Completed:Wait()
-					if not cardF or not cardF.Parent then break end
-					local pulseOut = TweenService:Create(cardF,
-						TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-						{ BackgroundTransparency = 0.3 }
-					)
-					pulseOut:Play()
-					pulseOut.Completed:Wait()
-				end
-			end)
+			pulseProperty(cardF, "BackgroundTransparency", 0.3, 0.45, 0.75)
 		end
 	end
 
@@ -1357,21 +1367,22 @@ local function renderCardInSlot(slotFrame, cardID, power, basePower, isPending)
 	end
 end
 
-local function renderMyBoard(myBoards)
-	if not myBoards then return end
+local function renderBoard(boards, gridKey)
+	if not boards then return end
 	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
 		local lf = locationFrames[locIdx]
 		if not lf then continue end
 
-		clearSlotContents(lf.myGrid)
+		local grid = lf[gridKey]
+		clearSlotContents(grid)
 
-		local board = myBoards[locIdx]
+		local board = boards[locIdx]
 		if not board then continue end
 
 		for row = 1, GameConfig.GRID_ROWS do
 			for col = 1, GameConfig.GRID_COLUMNS do
 				local slotName = string.format("Slot_%d_%d", col, row)
-				local slotFrame = lf.myGrid:FindFirstChild(slotName)
+				local slotFrame = grid:FindFirstChild(slotName)
 				if not slotFrame then continue end
 
 				local cardState = board[row] and board[row][col]
@@ -1393,36 +1404,12 @@ local function renderMyBoard(myBoards)
 	end
 end
 
+local function renderMyBoard(myBoards)
+	renderBoard(myBoards, "myGrid")
+end
+
 local function renderOppBoard(oppBoards)
-	if not oppBoards then return end
-	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
-		local lf = locationFrames[locIdx]
-		if not lf then continue end
-
-		clearSlotContents(lf.oppGrid)
-
-		local board = oppBoards[locIdx]
-		if not board then continue end
-
-		for row = 1, GameConfig.GRID_ROWS do
-			for col = 1, GameConfig.GRID_COLUMNS do
-				local slotName = string.format("Slot_%d_%d", col, row)
-				local slotFrame = lf.oppGrid:FindFirstChild(slotName)
-				if not slotFrame then continue end
-
-				local cardState = board[row] and board[row][col]
-				if cardState then
-					local cardID = type(cardState) == "table" and cardState.cardID or cardState
-					local power, basePower
-					if type(cardState) == "table" then
-						power = cardState.currentPower
-						basePower = cardState.basePower
-					end
-					renderCardInSlot(slotFrame, cardID, power, basePower, false)
-				end
-			end
-		end
-	end
+	renderBoard(oppBoards, "oppGrid")
 end
 
 local function renderHand()
@@ -1579,16 +1566,7 @@ local function highlightValidSlots()
 				local stroke = slotFrame:FindFirstChild("SlotStroke")
 				if not stroke then continue end
 
-				local isValid = true
-
-				if loc and loc.effect then
-					if loc.effect == "Restrict:MinCost:3" and def.cost < 3 then
-						isValid = false
-					end
-					if loc.effect == "Restrict:FrontRowOnly" and row ~= 1 then
-						isValid = false
-					end
-				end
+				local isValid = LocationRestrictions.canPlayAt(loc, def, row)
 
 				local hasPending = false
 				for _, play in ipairs(pendingPlays) do
@@ -1609,25 +1587,8 @@ local function highlightValidSlots()
 					stroke.Thickness = 2
 
 					-- Pulsing border animation (Phase 3C)
-					local tweenKey = "slotPulse_" .. locIdx .. "_" .. slotName
-					task.spawn(function()
-						while stroke and stroke.Parent and selectedCardID do
-							local pulseIn = TweenService:Create(stroke,
-								TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-								{ Transparency = 0.6 }
-							)
-							activeTweens[tweenKey] = pulseIn
-							pulseIn:Play()
-							pulseIn.Completed:Wait()
-							if not stroke or not stroke.Parent or not selectedCardID then break end
-							local pulseOut = TweenService:Create(stroke,
-								TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-								{ Transparency = 0 }
-							)
-							activeTweens[tweenKey] = pulseOut
-							pulseOut:Play()
-							pulseOut.Completed:Wait()
-						end
+					pulseProperty(stroke, "Transparency", 0, 0.6, 0.5, function()
+						return selectedCardID ~= nil
 					end)
 				end
 			end
@@ -1734,22 +1695,8 @@ local function submitPlays()
 	if waitingLabel then
 		waitingLabel.Visible = true
 		-- Waiting pulsing text (Phase 3H)
-		task.spawn(function()
-			while waitingLabel and waitingLabel.Visible do
-				local fadeOut = TweenService:Create(waitingLabel,
-					TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-					{ TextTransparency = 0.5 }
-				)
-				fadeOut:Play()
-				fadeOut.Completed:Wait()
-				if not waitingLabel or not waitingLabel.Visible then break end
-				local fadeIn = TweenService:Create(waitingLabel,
-					TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-					{ TextTransparency = 0 }
-				)
-				fadeIn:Play()
-				fadeIn.Completed:Wait()
-			end
+		pulseProperty(waitingLabel, "TextTransparency", 0, 0.5, 0.75, function()
+			return waitingLabel and waitingLabel.Visible
 		end)
 	end
 end
@@ -1826,15 +1773,10 @@ function onSlotClicked(locIdx, col, row)
 
 	-- Check location restrictions
 	local loc = locations[locIdx]
-	if loc and loc.effect then
-		if loc.effect == "Restrict:MinCost:3" and def.cost < 3 then
-			showToast("Restricted by " .. (loc.name or "location"))
-			return
-		end
-		if loc.effect == "Restrict:FrontRowOnly" and row ~= 1 then
-			showToast("Restricted by " .. (loc.name or "location"))
-			return
-		end
+	local canPlay, restrictReason = LocationRestrictions.canPlayAt(loc, def, row)
+	if not canPlay then
+		showToast(restrictReason)
+		return
 	end
 
 	table.insert(pendingPlays, {

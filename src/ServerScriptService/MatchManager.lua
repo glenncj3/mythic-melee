@@ -20,6 +20,9 @@ local CardDatabase = require(Modules.CardDatabase)
 local LocationDatabase = require(Modules.LocationDatabase)
 local AbilityRegistry = require(Modules.AbilityRegistry)
 local SlotGrid = require(Modules.SlotGrid)
+local GSU = require(Modules.GameStateUtils)
+local LocationRestrictions = require(Modules.LocationRestrictions)
+local LocationEffectRegistry = require(Modules.LocationEffectRegistry)
 
 local MatchManager = {}
 MatchManager.__index = MatchManager
@@ -66,6 +69,7 @@ function MatchManager.new(player1, player2, isPlayer2Bot)
 	self.turnSubmissions = {}
 	self.submissionEvents = {}  -- signals for waiting on submissions
 	self.matchActive = false
+	self.testMode = false  -- set true for bot-vs-bot test matches
 
 	return self
 end
@@ -89,6 +93,24 @@ local function copyDeck(deckTemplate)
 		table.insert(deck, cardID)
 	end
 	return deck
+end
+
+-- ============================================================
+-- Card State Helper (MatchManager-specific)
+-- ============================================================
+
+local function makeCardState(cardID, turnPlayed, playOrder)
+	local def = CardDatabase[cardID]
+	return {
+		cardID = cardID,
+		basePower = def.power,
+		powerModifiers = {},
+		currentPower = def.power,
+		isToken = false,
+		isImmune = false,
+		turnPlayed = turnPlayed,
+		playOrder = playOrder,
+	}
 end
 
 -- ============================================================
@@ -123,7 +145,6 @@ function MatchManager:initGameState()
 	elseif loc2.pointValue > loc1.pointValue then
 		locationPriority = { 2, 1 }
 	else
-		-- Random tiebreak
 		if math.random(2) == 1 then
 			locationPriority = { 1, 2 }
 		else
@@ -218,60 +239,6 @@ function MatchManager:initGameState()
 
 	print(string.format("[Match] Player 1: %s (hand: %s)", p1ID, table.concat(hand1, ", ")))
 	print(string.format("[Match] Player 2: %s (hand: %s)", p2ID, table.concat(hand2, ", ")))
-end
-
--- ============================================================
--- Card State Helpers
--- ============================================================
-
-local function makeCardState(cardID, turnPlayed, playOrder)
-	local def = CardDatabase[cardID]
-	return {
-		cardID = cardID,
-		basePower = def.power,
-		powerModifiers = {},
-		currentPower = def.power,
-		isToken = false,
-		isImmune = false,
-		turnPlayed = turnPlayed,
-		playOrder = playOrder,
-	}
-end
-
-local function getCard(gameState, playerID, locIdx, col, row)
-	local board = gameState.players[playerID].boards[locIdx]
-	if board and board[row] and board[row][col] then
-		return board[row][col]
-	end
-	return nil
-end
-
-local function sumPowerAtLocation(gameState, playerID, locIdx)
-	local total = 0
-	local hasDoubler = false
-	for row = 1, GameConfig.GRID_ROWS do
-		for col = 1, GameConfig.GRID_COLUMNS do
-			local card = getCard(gameState, playerID, locIdx, col, row)
-			if card then
-				AbilityRegistry.recalculatePower(card)
-				total = total + card.currentPower
-				if card._doublesLocationPower then
-					hasDoubler = true
-				end
-			end
-		end
-	end
-	if hasDoubler then
-		total = total * 2
-	end
-	return total
-end
-
-local function getOpponentID(gameState, playerID)
-	for pid, _ in pairs(gameState.players) do
-		if pid ~= playerID then return pid end
-	end
-	return nil
 end
 
 -- ============================================================
@@ -390,61 +357,49 @@ end
 function MatchManager:applyStartOfTurnEffect(locIdx)
 	local gs = self.gameState
 	local location = gs.locations[locIdx]
-	if not location or not location.effect then return end
-
-	-- Verdant Grove: +1 Power to all cards here (both players)
-	if location.effect == "StartOfTurn:AddPower:AllHere:1" then
-		if gs.turn > 1 then  -- Don't apply on turn 1 (no cards yet)
-			for pid, _ in pairs(gs.players) do
-				for row = 1, GameConfig.GRID_ROWS do
-					for col = 1, GameConfig.GRID_COLUMNS do
-						local card = getCard(gs, pid, locIdx, col, row)
-						if card then
-							table.insert(card.powerModifiers, {
-								source = "VERDANT_GROVE_START",
-								amount = 1,
-							})
-							print(string.format("[Match] Verdant Grove: +1 Power to %s (%s) at loc %d (%d,%d)",
-								card.cardID, pid, locIdx, col, row))
-						end
-					end
-				end
-			end
-		end
-	end
+	LocationEffectRegistry.applyStartOfTurn(location, locIdx, gs)
 end
 
 -- ============================================================
 -- Client Communication
 -- ============================================================
 
-function MatchManager:sendTurnStart()
-	local gs = self.gameState
-	local turnStartEvent = Events:FindFirstChild("TurnStart")
-	if not turnStartEvent then return end
+-- Fire a RemoteEvent to all human players in this match.
+-- dataBuilderFn(pid, opponentID) should return the payload table for that player.
+function MatchManager:fireClients(eventName, dataBuilderFn)
+	local event = Events:FindFirstChild(eventName)
+	if not event then return end
 
+	local gs = self.gameState
 	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
 		if pid ~= "BOT" then
-			local player = self.playerObjects[pid]
-			if player and typeof(player) == "Instance" then
-				local opponentID = getOpponentID(gs, pid)
-				local visibleState = {
-					turn = gs.turn,
-					phase = gs.phase,
-					energy = gs.players[pid].energy,
-					hand = gs.players[pid].hand,
-					myBoards = gs.players[pid].boards,
-					oppBoards = self:getVisibleOpponentBoards(opponentID),
-					oppHandSize = #gs.players[opponentID].hand,
-					myScore = gs.players[pid].score,
-					oppScore = gs.players[opponentID].score,
-					locations = gs.locations,
-					deckSize = #gs.players[pid].deck,
-				}
-				turnStartEvent:FireClient(player, visibleState)
+			local playerObj = self.playerObjects[pid]
+			if playerObj and typeof(playerObj) == "Instance" then
+				local opponentID = GSU.getOpponent(gs, pid)
+				local data = dataBuilderFn(pid, opponentID)
+				event:FireClient(playerObj, data)
 			end
 		end
 	end
+end
+
+function MatchManager:sendTurnStart()
+	local gs = self.gameState
+	self:fireClients("TurnStart", function(pid, opponentID)
+		return {
+			turn = gs.turn,
+			phase = gs.phase,
+			energy = gs.players[pid].energy,
+			hand = gs.players[pid].hand,
+			myBoards = gs.players[pid].boards,
+			oppBoards = self:getVisibleOpponentBoards(opponentID),
+			oppHandSize = #gs.players[opponentID].hand,
+			myScore = gs.players[pid].score,
+			oppScore = gs.players[opponentID].score,
+			locations = gs.locations,
+			deckSize = #gs.players[pid].deck,
+		}
+	end)
 end
 
 function MatchManager:getVisibleOpponentBoards(opponentID)
@@ -455,9 +410,9 @@ function MatchManager:getVisibleOpponentBoards(opponentID)
 		for row = 1, GameConfig.GRID_ROWS do
 			boards[locIdx][row] = {}
 			for col = 1, GameConfig.GRID_COLUMNS do
-				local card = getCard(gs, opponentID, locIdx, col, row)
+				local card = GSU.getCard(gs, opponentID, locIdx, col, row)
 				if card then
-					AbilityRegistry.recalculatePower(card)
+					GSU.recalculatePower(card)
 					boards[locIdx][row][col] = {
 						cardID = card.cardID,
 						currentPower = card.currentPower,
@@ -475,86 +430,50 @@ end
 
 function MatchManager:sendRevealResult()
 	local gs = self.gameState
-	local revealEvent = Events:FindFirstChild("RevealResult")
-	if not revealEvent then return end
-
-	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
-		if pid ~= "BOT" then
-			local player = self.playerObjects[pid]
-			if player and typeof(player) == "Instance" then
-				local opponentID = getOpponentID(gs, pid)
-				local resultData = {
-					turn = gs.turn,
-					myBoards = gs.players[pid].boards,
-					oppBoards = self:getVisibleOpponentBoards(opponentID),
-					myPlays = gs.turnPlays[pid] or {},
-					oppPlays = gs.turnPlays[opponentID] or {},
-					locations = gs.locations,
-				}
-				revealEvent:FireClient(player, resultData)
-			end
-		end
-	end
+	self:fireClients("RevealResult", function(pid, opponentID)
+		return {
+			turn = gs.turn,
+			myBoards = gs.players[pid].boards,
+			oppBoards = self:getVisibleOpponentBoards(opponentID),
+			myPlays = gs.turnPlays[pid] or {},
+			oppPlays = gs.turnPlays[opponentID] or {},
+			locations = gs.locations,
+		}
+	end)
 end
 
 function MatchManager:sendScoreUpdate()
 	local gs = self.gameState
-	local scoreEvent = Events:FindFirstChild("ScoreUpdate")
-	if not scoreEvent then return end
-
-	-- Send per-player data directly — never use player IDs as table keys
-	-- over RemoteEvents (Roblox converts numeric string keys to numbers)
-	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
-		if pid ~= "BOT" then
-			local player = self.playerObjects[pid]
-			if player and typeof(player) == "Instance" then
-				local opponentID = getOpponentID(gs, pid)
-				local scoreData = {
-					turn = gs.turn,
-					myScore = gs.players[pid].score,
-					oppScore = gs.players[opponentID].score,
-				}
-				scoreEvent:FireClient(player, scoreData)
-			end
-		end
-	end
+	self:fireClients("ScoreUpdate", function(pid, opponentID)
+		return {
+			turn = gs.turn,
+			myScore = gs.players[pid].score,
+			oppScore = gs.players[opponentID].score,
+		}
+	end)
 end
 
 function MatchManager:sendGameOver(winnerID)
 	local gs = self.gameState
-	local gameOverEvent = Events:FindFirstChild("GameOver")
-	if not gameOverEvent then return end
-
-	-- Send per-player data directly to avoid RemoteEvent key type conversion
-	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
-		if pid ~= "BOT" then
-			local player = self.playerObjects[pid]
-			if player and typeof(player) == "Instance" then
-				local opponentID = getOpponentID(gs, pid)
-				local isWinner = (winnerID == pid)
-				local isDraw = (winnerID == "DRAW")
-				local resultData = {
-					won = isWinner,
-					draw = isDraw,
-					myFinalScore = gs.players[pid].score,
-					oppFinalScore = gs.players[opponentID].score,
-					totalTurns = gs.turn,
-				}
-				gameOverEvent:FireClient(player, resultData)
-			end
-		end
-	end
+	self:fireClients("GameOver", function(pid, opponentID)
+		return {
+			won = (winnerID == pid),
+			draw = (winnerID == "DRAW"),
+			myFinalScore = gs.players[pid].score,
+			oppFinalScore = gs.players[opponentID].score,
+			totalTurns = gs.turn,
+		}
+	end)
 end
 
 function MatchManager:sendInvalidPlay(playerID, reason)
-	local invalidEvent = Events:FindFirstChild("InvalidPlay")
-	if not invalidEvent then return end
+	if playerID == "BOT" then return end
+	local playerObj = self.playerObjects[playerID]
+	if not playerObj or typeof(playerObj) ~= "Instance" then return end
 
-	if playerID ~= "BOT" then
-		local player = self.playerObjects[playerID]
-		if player and typeof(player) == "Instance" then
-			invalidEvent:FireClient(player, { reason = reason })
-		end
+	local event = Events:FindFirstChild("InvalidPlay")
+	if event then
+		event:FireClient(playerObj, { reason = reason })
 	end
 end
 
@@ -590,6 +509,15 @@ function MatchManager:waitForSubmissions()
 	local p1ID = self.playerIDs[1]
 	local p2ID = self.playerIDs[2]
 
+	-- Test mode: both players are bots, inject plays synchronously
+	if self.testMode then
+		local BotPlayer = require(script.Parent.BotPlayer)
+		self.turnSubmissions[p1ID] = BotPlayer.decidePlays(gs, p1ID)
+		self.turnSubmissions[p2ID] = BotPlayer.decidePlays(gs, p2ID)
+		gs.phase = "RESOLVING"
+		return
+	end
+
 	-- Reset submission signals
 	self.submissionEvents[p1ID] = false
 	self.submissionEvents[p2ID] = false
@@ -619,7 +547,6 @@ function MatchManager:waitForSubmissions()
 		local elapsed = tick() - timerStart
 		if elapsed >= timeout then
 			print(string.format("[Match] Timer expired (%.1fs)", elapsed))
-			-- Empty submission = pass for any player who didn't submit
 			if not p1Done then
 				print(string.format("[Match] %s auto-passed (timer)", p1ID))
 				self.turnSubmissions[p1ID] = {}
@@ -700,28 +627,13 @@ function MatchManager:validateSubmission(playerID, submission)
 			continue
 		end
 
-		-- Each player has their own separate 3x2 grid at each location.
-		-- No need to check opponent's board — players can never play on each other's grids.
-		-- Overwriting own cards (own slot already occupied) is handled in placeCards.
-
 		-- Check location restrictions
 		local location = gs.locations[locIdx]
-		if location.effect then
-			-- Sky Temple: only cards costing 3+
-			if location.effect == "Restrict:MinCost:3" and def.cost < 3 then
-				print(string.format("[Match] REJECTED: %s play %d — %s (cost %d) blocked by Sky Temple",
-					playerID, i, cardID, def.cost))
-				self:sendInvalidPlay(playerID, cardID .. " blocked by " .. location.name)
-				continue
-			end
-
-			-- Dueling Grounds: front row only (row 1)
-			if location.effect == "Restrict:FrontRowOnly" and row ~= 1 then
-				print(string.format("[Match] REJECTED: %s play %d — back row blocked by Dueling Grounds",
-					playerID, i))
-				self:sendInvalidPlay(playerID, "Only front row allowed at " .. location.name)
-				continue
-			end
+		local canPlay, reason = LocationRestrictions.canPlayAt(location, def, row)
+		if not canPlay then
+			print(string.format("[Match] REJECTED: %s play %d — %s", playerID, i, reason))
+			self:sendInvalidPlay(playerID, reason)
+			continue
 		end
 
 		-- Valid play
@@ -758,11 +670,11 @@ function MatchManager:placeCards(playerID, validPlays)
 		local def = CardDatabase[cardID]
 
 		-- Check for overwrite (own card already in slot)
-		local existingCard = getCard(gs, playerID, locIdx, col, row)
+		local existingCard = GSU.getCard(gs, playerID, locIdx, col, row)
 		if existingCard then
 			print(string.format("[Match] OVERWRITE: %s destroys their %s at loc %d (%d,%d)",
 				playerID, existingCard.cardID, locIdx, col, row))
-			gs.players[playerID].boards[locIdx][row][col] = nil
+			GSU.setCard(gs, playerID, locIdx, col, row, nil)
 		end
 
 		-- Remove card from hand
@@ -779,40 +691,13 @@ function MatchManager:placeCards(playerID, validPlays)
 		-- Create card state and place on board
 		local cardState = makeCardState(cardID, gs.turn, play.playOrder)
 
-		-- Apply location on-play effects
+		-- Apply location on-play effects via registry
 		local location = gs.locations[locIdx]
-		if location.effect then
-			-- War Camp: +1 Power on play
-			if location.effect == "OnPlay:AddPower:Self:1" then
-				table.insert(cardState.powerModifiers, {
-					source = location.id .. "_EFFECT",
-					amount = 1,
-				})
-				print(string.format("[Match] %s effect: +1 Power to %s", location.name, cardID))
-			end
-
-			-- Frozen Lake: -1 Power on play
-			if location.effect == "OnPlay:AddPower:Self:-1" then
-				table.insert(cardState.powerModifiers, {
-					source = location.id .. "_EFFECT",
-					amount = -1,
-				})
-				print(string.format("[Match] %s effect: -1 Power to %s", location.name, cardID))
-			end
-
-			-- Mana Well: draw a card on play
-			if location.effect == "OnPlay:DrawCard:1" then
-				if #player.hand < GameConfig.MAX_HAND_SIZE and #player.deck > 0 then
-					local drawn = table.remove(player.deck, 1)
-					table.insert(player.hand, drawn)
-					print(string.format("[Match] %s effect: %s drew %s", location.name, playerID, drawn))
-				end
-			end
-		end
+		LocationEffectRegistry.applyOnPlay(location, cardState, playerID, gs)
 
 		-- Place the card
-		gs.players[playerID].boards[locIdx][row][col] = cardState
-		AbilityRegistry.recalculatePower(cardState)
+		GSU.setCard(gs, playerID, locIdx, col, row, cardState)
+		GSU.recalculatePower(cardState)
 
 		print(string.format("[Match] PLACED: %s's %s at loc %d (%d,%d) — Power %d",
 			playerID, cardID, locIdx, col, row, cardState.currentPower))
@@ -848,12 +733,11 @@ function MatchManager:resolveOnReveals()
 		end
 
 		for _, pid in ipairs(resolveOrder) do
-			-- Get cards this player placed at this location THIS turn, in play order
 			local plays = gs.turnPlays[pid] or {}
 			local newCards = {}
 			for _, play in ipairs(plays) do
 				if play.locIdx == locIdx then
-					local card = getCard(gs, pid, locIdx, play.col, play.row)
+					local card = GSU.getCard(gs, pid, locIdx, play.col, play.row)
 					if card then
 						table.insert(newCards, {
 							card = card,
@@ -865,10 +749,8 @@ function MatchManager:resolveOnReveals()
 				end
 			end
 
-			-- Sort by play order
 			table.sort(newCards, function(a, b) return a.playOrder < b.playOrder end)
 
-			-- Resolve each On Reveal
 			for _, entry in ipairs(newCards) do
 				local def = CardDatabase[entry.card.cardID]
 				if def and def.ability and AbilityRegistry.isOnReveal(def.ability) then
@@ -917,7 +799,7 @@ function MatchManager:recalculateOngoing()
 				for col = 1, GameConfig.GRID_COLUMNS do
 					local card = player.boards[locIdx][row][col]
 					if card then
-						AbilityRegistry.recalculatePower(card)
+						GSU.recalculatePower(card)
 					end
 				end
 			end
@@ -938,8 +820,8 @@ function MatchManager:scoreLocations()
 
 	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
 		local location = gs.locations[locIdx]
-		local p1Power = sumPowerAtLocation(gs, p1ID, locIdx)
-		local p2Power = sumPowerAtLocation(gs, p2ID, locIdx)
+		local p1Power = GSU.sumPowerAtLocation(gs, p1ID, locIdx)
+		local p2Power = GSU.sumPowerAtLocation(gs, p2ID, locIdx)
 
 		local p1Points = 0
 		local p2Points = 0
@@ -949,7 +831,6 @@ function MatchManager:scoreLocations()
 		elseif p2Power > p1Power then
 			p2Points = location.pointValue
 		else
-			-- Tie: each player gets 1 point
 			p1Points = 1
 			p2Points = 1
 		end
@@ -957,7 +838,7 @@ function MatchManager:scoreLocations()
 		gs.players[p1ID].score = gs.players[p1ID].score + p1Points
 		gs.players[p2ID].score = gs.players[p2ID].score + p2Points
 
-		print(string.format("[Match] %s: %s Power %d vs %s Power %d → %s +%d, %s +%d",
+		print(string.format("[Match] %s: %s Power %d vs %s Power %d -> %s +%d, %s +%d",
 			location.name,
 			p1ID, p1Power, p2ID, p2Power,
 			p1ID, p1Points, p2ID, p2Points))
@@ -982,7 +863,6 @@ function MatchManager:checkWinCondition()
 
 	if p1Score >= threshold or p2Score >= threshold then
 		if gs.tiebreaker then
-			-- Already in tiebreaker — determine winner
 			local winner
 			if p1Score > p2Score then
 				winner = p1ID
@@ -1000,7 +880,6 @@ function MatchManager:checkWinCondition()
 		elseif p2Score > p1Score then
 			self:endGame(p2ID)
 		else
-			-- Exact tie at threshold — play one more tiebreaker turn
 			print("[Match] TIEBREAKER: both players at " .. p1Score .. " — playing one more turn")
 			gs.tiebreaker = true
 		end
@@ -1032,97 +911,38 @@ end
 -- Test-only API (for Phase 2 tests)
 -- ============================================================
 
--- Run a bot-vs-bot match to completion without RemoteEvents
+-- Run a bot-vs-bot match to completion without RemoteEvents.
+-- Reuses the real runTurn() logic to prevent test/prod drift.
 function MatchManager.runTestMatch()
 	print("\n[TestMatch] Starting bot-vs-bot test match...")
 
-	local match = setmetatable({}, MatchManager)
-	match.playerIDs = { [1] = "BOT_A", [2] = "BOT_B" }
-	match.playerObjects = { ["BOT_A"] = "BOT_A", ["BOT_B"] = "BOT_B" }
-	match.isPlayer2Bot = true
-	match.player1 = "BOT_A"
-	match.player2 = "BOT_B"
+	local match = MatchManager.new("BOT_A", "BOT_B", false)
+	match.testMode = true
 	match.matchActive = true
-	match.turnSubmissions = {}
-	match.submissionEvents = {}
-
 	match:initGameState()
-
-	local BotPlayer = require(script.Parent.BotPlayer)
-	local gs = match.gameState
-	local p1ID = "BOT_A"
-	local p2ID = "BOT_B"
 
 	print("[TestMatch] === MATCH STARTED ===")
 
-	local maxTurns = 30  -- Safety limit
-	while match.matchActive and gs.phase ~= "GAME_OVER" and gs.turn < maxTurns do
-		-- ADVANCE TURN
-		gs.turn = gs.turn + 1
-		print(string.format("\n[TestMatch] ========== TURN %d ==========", gs.turn))
-
-		-- GRANT ENERGY (max increases, then refill to max)
-		for _, pid in ipairs({p1ID, p2ID}) do
-			gs.players[pid].maxEnergy = gs.players[pid].maxEnergy + GameConfig.ENERGY_PER_TURN
-			gs.players[pid].energy = gs.players[pid].maxEnergy
-		end
-
-		-- DRAW CARDS
-		for _, pid in ipairs({p1ID, p2ID}) do
-			local player = gs.players[pid]
-			if #player.hand < GameConfig.MAX_HAND_SIZE and #player.deck > 0 then
-				local card = table.remove(player.deck, 1)
-				table.insert(player.hand, card)
-			end
-		end
-
-		-- START-OF-TURN EFFECTS
-		for _, locIdx in ipairs(gs.locationPriority) do
-			match:applyStartOfTurnEffect(locIdx)
-		end
-
-		gs.phase = "PLANNING"
-
-		-- BOT SUBMISSIONS
-		local bot1Plays = BotPlayer.decidePlays(gs, p1ID)
-		local bot2Plays = BotPlayer.decidePlays(gs, p2ID)
-
-		-- VALIDATE AND PLACE
-		gs.turnPlays = {}
-		gs.turnPlays[p1ID] = match:validateSubmission(p1ID, bot1Plays)
-		gs.turnPlays[p2ID] = match:validateSubmission(p2ID, bot2Plays)
-		match:placeCards(p1ID, gs.turnPlays[p1ID])
-		match:placeCards(p2ID, gs.turnPlays[p2ID])
-
-		gs.phase = "RESOLVING"
-
-		-- RESOLVE ON REVEALS
-		match:resolveOnReveals()
-
-		-- RECALCULATE ONGOING
-		match:recalculateOngoing()
-
-		-- SCORE
-		match:scoreLocations()
-
-		-- WIN CHECK
-		match:checkWinCondition()
+	local maxTurns = 30
+	while match.matchActive and match.gameState.phase ~= "GAME_OVER" and match.gameState.turn < maxTurns do
+		match:runTurn()
 	end
 
-	if gs.turn >= maxTurns and gs.phase ~= "GAME_OVER" then
+	if match.gameState.turn >= maxTurns and match.gameState.phase ~= "GAME_OVER" then
 		print("[TestMatch] Hit turn limit — forcing game end")
-		local p1S = gs.players[p1ID].score
-		local p2S = gs.players[p2ID].score
+		local gs = match.gameState
+		local p1S = gs.players["BOT_A"].score
+		local p2S = gs.players["BOT_B"].score
 		if p1S > p2S then
-			match:endGame(p1ID)
+			match:endGame("BOT_A")
 		elseif p2S > p1S then
-			match:endGame(p2ID)
+			match:endGame("BOT_B")
 		else
 			match:endGame("DRAW")
 		end
 	end
 
-	return gs
+	return match.gameState
 end
 
 return MatchManager
