@@ -645,12 +645,14 @@ local function createMatchUI()
 	handFrame.Parent = sidebar
 
 	local handGrid = Instance.new("UIGridLayout")
-	handGrid.CellSize = UDim2.new(0.48, 0, 0.32, 0)
-	handGrid.CellPadding = UDim2.new(0.02, 0, 0.01, 0)
+	-- Cell is portrait: width ~33% of container, height ~32% — produces roughly 3:4 ratio
+	handGrid.CellSize = UDim2.new(0.47, 0, 0.31, 0)
+	handGrid.CellPadding = UDim2.new(0.03, 0, 0.015, 0)
 	handGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	handGrid.VerticalAlignment = Enum.VerticalAlignment.Top
 	handGrid.SortOrder = Enum.SortOrder.LayoutOrder
 	handGrid.FillDirection = Enum.FillDirection.Horizontal
+	handGrid.FillDirectionMaxCells = 2
 	handGrid.Parent = handFrame
 
 	-- Confirm button (bottom of sidebar)
@@ -1458,18 +1460,10 @@ local function renderHand()
 		local available = myEnergy - energySpent
 		local canAfford = def.cost <= available
 
-		-- Create card at "board" size so it fills the grid cell
+		-- Create card at "board" size — grid cell controls dimensions
 		local cardF = CardFrame.create(cardID, "board")
 		if cardF then
 			cardF.LayoutOrder = i
-			-- Card fills the grid cell (UIGridLayout sets cell size)
-			cardF.Size = UDim2.new(1, 0, 1, 0)
-
-			-- Force portrait aspect ratio within grid cell
-			local cellAspect = Instance.new("UIAspectRatioConstraint")
-			cellAspect.AspectRatio = 3 / 4
-			cellAspect.DominantAxis = Enum.DominantAxis.Height
-			cellAspect.Parent = cardF
 
 			-- Unaffordable cards: dim
 			if not canAfford then

@@ -111,14 +111,15 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		-- Board cards: fill slot dimensions (slot has its own aspect constraint)
 		frame.Size = UDim2.new(1, 0, 1, 0)
 	end
-	frame.BackgroundColor3 = Color3.fromRGB(35, 38, 50)
+	frame.BackgroundColor3 = Color3.fromRGB(50, 55, 75)
 	frame.BorderSizePixel = 0
+	frame.ClipDescendants = true
 
 	-- Rarity border (UIStroke) — thick enough to always see
 	local stroke = Instance.new("UIStroke")
 	stroke.Name = "RarityStroke"
 	stroke.Color = rarityColor
-	stroke.Thickness = math.max(RARITY_THICKNESS[def.rarity] or 2, 2)
+	stroke.Thickness = math.max(RARITY_THICKNESS[def.rarity] or 2, 3)
 	stroke.Parent = frame
 
 	-- Rounded corners
@@ -126,11 +127,13 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = frame
 
-	-- Art area — flat color, no gradient (keeps colors bright and visible)
+	-- Art area — flat color, explicit ZIndex to ensure visibility
 	local artFrame = Instance.new("Frame")
 	artFrame.Name = "Art"
 	artFrame.BackgroundColor3 = artColor
+	artFrame.BackgroundTransparency = 0
 	artFrame.BorderSizePixel = 0
+	artFrame.ZIndex = 1
 	artFrame.Parent = frame
 
 	local artCorner = Instance.new("UICorner")
@@ -267,7 +270,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		glowFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 		glowFrame.BackgroundTransparency = 1
 		glowFrame.BorderSizePixel = 0
-		glowFrame.ZIndex = 0
+		glowFrame.ZIndex = -1
 		glowFrame.Parent = frame
 
 		local glowCorner = Instance.new("UICorner")
