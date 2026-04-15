@@ -39,7 +39,7 @@ local function countOngoingCards(gameState, playerID, excludeCol, excludeRow, ex
 					local card = GSU.getCard(gameState, playerID, locIdx, col, row)
 					if card then
 						local def = CardDatabase[card.cardID]
-						if def and def.ability and string.find(def.ability, "^Ongoing:") then
+						if def and def.ability and AbilityRegistry.isOngoing(def.ability) then
 							count = count + 1
 						end
 					end
@@ -358,12 +358,12 @@ end
 -- Public API
 -- ============================================================
 
--- Parse an ability string into trigger, effect, and params
+-- Parse a single ability segment into trigger, effect, and params
 function AbilityRegistry.parse(abilityString)
 	if not abilityString then return nil end
 	local parts = string.split(abilityString, ":")
 	if #parts < 2 then return nil end
-	local trigger = parts[1]  -- "OnReveal" or "Ongoing"
+	local trigger = parts[1]  -- "OnReveal", "Ongoing", "OnDestroy", "EndOfTurn"
 	local effect = parts[2]   -- "AddPower", "RemovePower", etc.
 	local params = {}
 	for i = 3, #parts do
@@ -372,54 +372,71 @@ function AbilityRegistry.parse(abilityString)
 	return { trigger = trigger, effect = effect, params = params }
 end
 
--- Resolve an On Reveal ability
+-- Parse a compound ability string (pipe-separated) into an array of parsed sub-abilities
+function AbilityRegistry.parseAll(abilityString)
+	if not abilityString then return {} end
+	local results = {}
+	local segments = string.split(abilityString, "|")
+	for _, segment in ipairs(segments) do
+		local parsed = AbilityRegistry.parse(segment)
+		if parsed then
+			table.insert(results, parsed)
+		end
+	end
+	return results
+end
+
+-- Resolve all On Reveal sub-abilities for a card
 function AbilityRegistry.resolveOnReveal(gameState, sourceCard, playerID, locIdx, col, row)
 	local CardDatabase = require(script.Parent.CardDatabase)
 	local def = CardDatabase[sourceCard.cardID]
 	if not def or not def.ability then return end
 
-	local parsed = AbilityRegistry.parse(def.ability)
-	if not parsed or parsed.trigger ~= "OnReveal" then return end
-
 	-- Check if location suppresses On Reveal
 	local location = gameState.locations[locIdx]
-	if location and location.effect == "SuppressOnReveal" then
+	if location and location.effect and string.find(location.effect, "SuppressOnReveal") then
 		print(string.format("  [Ability] %s: On Reveal suppressed by %s",
 			sourceCard.cardID, location.id))
 		return
 	end
 
-	local resolver = onRevealResolvers[parsed.effect]
-	if resolver then
-		resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
-	else
-		print(string.format("  [Ability] WARNING: no resolver for OnReveal effect '%s'", parsed.effect))
+	local allParsed = AbilityRegistry.parseAll(def.ability)
+	for _, parsed in ipairs(allParsed) do
+		if parsed.trigger == "OnReveal" then
+			local resolver = onRevealResolvers[parsed.effect]
+			if resolver then
+				resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+			else
+				print(string.format("  [Ability] WARNING: no resolver for OnReveal effect '%s'", parsed.effect))
+			end
+		end
 	end
 end
 
--- Apply a single Ongoing card's effect (called during recalculation sweep)
+-- Apply all Ongoing sub-abilities for a card (called during recalculation sweep)
 function AbilityRegistry.applyOngoing(gameState, sourceCard, playerID, locIdx, col, row)
 	local CardDatabase = require(script.Parent.CardDatabase)
 	local def = CardDatabase[sourceCard.cardID]
 	if not def or not def.ability then return end
 
-	local parsed = AbilityRegistry.parse(def.ability)
-	if not parsed or parsed.trigger ~= "Ongoing" then return end
-
-	-- Special case: Sage (AddPower:Self:PerOngoing)
-	if parsed.effect == "AddPower" and #parsed.params >= 2 and parsed.params[2] == "PerOngoing" then
-		local resolver = ongoingResolvers["AddPower_PerOngoing"]
-		if resolver then
-			resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+	local allParsed = AbilityRegistry.parseAll(def.ability)
+	for _, parsed in ipairs(allParsed) do
+		if parsed.trigger == "Ongoing" then
+			-- Special case: Sage (AddPower:Self:PerOngoing)
+			if parsed.effect == "AddPower" and #parsed.params >= 2 and parsed.params[2] == "PerOngoing" then
+				local resolver = ongoingResolvers["AddPower_PerOngoing"]
+				if resolver then
+					resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+				end
+			else
+				local resolver = ongoingResolvers[parsed.effect]
+				if resolver then
+					resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+				else
+					print(string.format("  [Ability] WARNING: no resolver for Ongoing effect '%s'", parsed.effect))
+				end
+			end
 		end
-		return
-	end
-
-	local resolver = ongoingResolvers[parsed.effect]
-	if resolver then
-		resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
-	else
-		print(string.format("  [Ability] WARNING: no resolver for Ongoing effect '%s'", parsed.effect))
 	end
 end
 
@@ -452,16 +469,22 @@ function AbilityRegistry.clearOngoingModifiers(gameState)
 	end
 end
 
--- Check if an ability string is an Ongoing type
+-- Check if any sub-ability is an Ongoing type
 function AbilityRegistry.isOngoing(abilityString)
 	if not abilityString then return false end
-	return string.find(abilityString, "^Ongoing:") ~= nil
+	for _, parsed in ipairs(AbilityRegistry.parseAll(abilityString)) do
+		if parsed.trigger == "Ongoing" then return true end
+	end
+	return false
 end
 
--- Check if an ability string is an OnReveal type
+-- Check if any sub-ability is an OnReveal type
 function AbilityRegistry.isOnReveal(abilityString)
 	if not abilityString then return false end
-	return string.find(abilityString, "^OnReveal:") ~= nil
+	for _, parsed in ipairs(AbilityRegistry.parseAll(abilityString)) do
+		if parsed.trigger == "OnReveal" then return true end
+	end
+	return false
 end
 
 -- ============================================================
@@ -474,10 +497,10 @@ function AbilityRegistry.printAllAbilities()
 	for _, id in ipairs(CardDatabase.getAllIDs()) do
 		local c = CardDatabase[id]
 		if c.ability then
-			local parsed = AbilityRegistry.parse(c.ability)
-			if parsed then
-				print(string.format("  [%s] %s -> trigger=%s, effect=%s, params={%s}",
-					id, c.ability, parsed.trigger, parsed.effect, table.concat(parsed.params, ", ")))
+			local allParsed = AbilityRegistry.parseAll(c.ability)
+			for j, parsed in ipairs(allParsed) do
+				print(string.format("  [%s] (%d/%d) trigger=%s, effect=%s, params={%s}",
+					id, j, #allParsed, parsed.trigger, parsed.effect, table.concat(parsed.params, ", ")))
 			end
 		end
 	end
@@ -486,6 +509,7 @@ end
 function AbilityRegistry.testParse()
 	print("=== AbilityRegistry Parse Test ===")
 	local tests = {
+		-- Single abilities
 		"OnReveal:AddPower:Location:1",
 		"OnReveal:RemovePower:Random_Enemy_Here:2",
 		"OnReveal:ConditionalPower:Opponent_Played_Here:3",
@@ -497,14 +521,20 @@ function AbilityRegistry.testParse()
 		"Ongoing:DoublePower:Location",
 		"Ongoing:Immune",
 		"Ongoing:AddPower:Self:PerOngoing",
+		-- Compound abilities
+		"OnReveal:DrawCard:1|Ongoing:AddPower:Adjacent:1",
+		"OnReveal:RemovePower:Random_Enemy_Here:3|OnReveal:AddPower:Self:2",
+		"EndOfTurn:AddPower:Self:2|Ongoing:AddPower:Adjacent:1",
 	}
 	for _, str in ipairs(tests) do
-		local parsed = AbilityRegistry.parse(str)
-		if parsed then
-			print(string.format("  OK: %s -> trigger=%s, effect=%s, params={%s}",
-				str, parsed.trigger, parsed.effect, table.concat(parsed.params, ", ")))
+		local allParsed = AbilityRegistry.parseAll(str)
+		if #allParsed > 0 then
+			for j, parsed in ipairs(allParsed) do
+				print(string.format("  OK [%d/%d]: %s -> trigger=%s, effect=%s, params={%s}",
+					j, #allParsed, str, parsed.trigger, parsed.effect, table.concat(parsed.params, ", ")))
+			end
 		else
-			print(string.format("  FAIL: %s -> parse returned nil", str))
+			print(string.format("  FAIL: %s -> parseAll returned empty", str))
 		end
 	end
 end
