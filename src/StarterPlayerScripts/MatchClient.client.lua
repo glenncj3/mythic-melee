@@ -1307,7 +1307,6 @@ GameOverEvent.OnClientEvent:Connect(function(resultData)
 	if finalScoreLabel then
 		local myFinalScore = resultData.myFinalScore or 0
 		local oppFinalScore = resultData.oppFinalScore or 0
-		end
 		finalScoreLabel.Text = string.format("Final Score: %d - %d  |  Turns: %d",
 			myFinalScore, oppFinalScore, resultData.totalTurns or 0)
 	end
