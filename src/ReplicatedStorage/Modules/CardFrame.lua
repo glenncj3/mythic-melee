@@ -2,13 +2,17 @@
 	CardFrame — shared card rendering component.
 
 	Creates GUI Frame elements for cards at three display sizes:
-		"board"  — fills parent slot (scale-based)
-		"hand"   — fixed 130x173 pixels
-		"detail" — fixed 240x340 pixels
+		"board"  — fills parent slot (scale-based), art + badges only
+		"hand"   — fills parent slot (scale-based), art + badges + name + ability
+		"detail" — fixed 240x340 pixels, shows everything + stats
 
-	Art: bright colored rectangle (top half of card).
-	Rarity borders: Common=white, Uncommon=green, Rare=blue, Legendary=gold.
+	Art: bright colored rectangle (top portion).
+	Rarity borders: Common=white, Uncommon=green+glow, Rare=blue+glow, Legendary=gold+glow.
 	Badges: Cost (blue, top-left), Power (gold, top-right).
+	Ability pip: OnReveal=orange, Ongoing=teal (small dot).
+
+	IMPORTANT: All elements use ZIndex >= 3 because parent containers
+	may have ZIndex=2 and Roblox ZIndex is global within a ScreenGui.
 ]]
 
 local CardDatabase = require(script.Parent.CardDatabase)
@@ -36,9 +40,17 @@ local ABILITY_PIP_COLORS = {
 }
 
 local SIZE_PRESETS = {
-	hand   = UDim2.new(0, 130, 0, 173),
 	detail = UDim2.new(0, 240, 0, 340),
 }
+
+-- Darken a color by a factor (0-1)
+local function darkenColor(color, factor)
+	return Color3.new(
+		math.max(0, color.R * (1 - factor)),
+		math.max(0, color.G * (1 - factor)),
+		math.max(0, color.B * (1 - factor))
+	)
+end
 
 function CardFrame.create(cardID, displaySize, overridePower)
 	local def = CardDatabase[cardID]
@@ -57,7 +69,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	local frame = Instance.new("Frame")
 	frame.Name = "Card_" .. cardID
 	frame.Size = size or UDim2.new(1, 0, 1, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(50, 55, 75)
+	frame.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
 	frame.BorderSizePixel = 0
 	frame.ZIndex = 3
 
@@ -65,16 +77,18 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = frame
 
+	-- Rarity border
 	local stroke = Instance.new("UIStroke")
 	stroke.Name = "RarityStroke"
 	stroke.Color = rarityColor
 	stroke.Thickness = RARITY_THICKNESS[def.rarity] or 2
 	stroke.Parent = frame
 
-	-- === ART AREA (top portion — bright colored rectangle) ===
+	-- === ART AREA (top portion — bright colored rectangle with subtle gradient) ===
 	local artFrame = Instance.new("Frame")
 	artFrame.Name = "Art"
-	artFrame.BackgroundColor3 = artColor
+	-- White background so UIGradient colors render accurately
+	artFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	artFrame.BorderSizePixel = 0
 	artFrame.ZIndex = 3
 	artFrame.Parent = frame
@@ -83,16 +97,21 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	artCorner.CornerRadius = UDim.new(0, 4)
 	artCorner.Parent = artFrame
 
+	-- Gradient from artColor to slightly darker — gives dimensionality
+	local artGradient = Instance.new("UIGradient")
+	artGradient.Color = ColorSequence.new(artColor, darkenColor(artColor, 0.2))
+	artGradient.Rotation = 135
+	artGradient.Parent = artFrame
+
 	if displaySize == "detail" then
 		artFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
 		artFrame.Size = UDim2.new(0.9, 0, 0.4, 0)
 	else
-		-- board and hand: same layout
 		artFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
 		artFrame.Size = UDim2.new(0.9, 0, 0.5, 0)
 	end
 
-	-- === COST BADGE (blue circle, top-left, offset positioning) ===
+	-- === COST BADGE (blue circle, top-left) ===
 	local badgeSize = 28
 	if displaySize == "detail" then badgeSize = 36 end
 
@@ -105,9 +124,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	costBadge.ZIndex = 4
 	costBadge.Parent = frame
 
-	local costCorner = Instance.new("UICorner")
-	costCorner.CornerRadius = UDim.new(1, 0)
-	costCorner.Parent = costBadge
+	Instance.new("UICorner", costBadge).CornerRadius = UDim.new(1, 0)
 
 	local costStroke = Instance.new("UIStroke")
 	costStroke.Color = Color3.fromRGB(10, 10, 15)
@@ -125,7 +142,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	costLabel.ZIndex = 5
 	costLabel.Parent = costBadge
 
-	-- === POWER BADGE (gold circle, top-right, offset positioning) ===
+	-- === POWER BADGE (gold circle, top-right) ===
 	local powerBadge = Instance.new("Frame")
 	powerBadge.Name = "PowerBadge"
 	powerBadge.Size = UDim2.new(0, badgeSize, 0, badgeSize)
@@ -136,9 +153,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	powerBadge.ZIndex = 4
 	powerBadge.Parent = frame
 
-	local powerCorner = Instance.new("UICorner")
-	powerCorner.CornerRadius = UDim.new(1, 0)
-	powerCorner.Parent = powerBadge
+	Instance.new("UICorner", powerBadge).CornerRadius = UDim.new(1, 0)
 
 	local powerStroke = Instance.new("UIStroke")
 	powerStroke.Color = Color3.fromRGB(10, 10, 15)
@@ -173,13 +188,16 @@ function CardFrame.create(cardID, displaySize, overridePower)
 			pip.ZIndex = 4
 			pip.Parent = frame
 
-			local pipCorner = Instance.new("UICorner")
-			pipCorner.CornerRadius = UDim.new(1, 0)
-			pipCorner.Parent = pip
+			Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+
+			local pipStroke = Instance.new("UIStroke")
+			pipStroke.Color = Color3.fromRGB(15, 15, 20)
+			pipStroke.Thickness = 1
+			pipStroke.Parent = pip
 		end
 	end
 
-	-- === NAME LABEL (hand and detail only) ===
+	-- === NAME LABEL (hand and detail) ===
 	if displaySize == "hand" or displaySize == "detail" then
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Name = "NameLabel"
@@ -202,7 +220,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		end
 	end
 
-	-- === ABILITY TEXT (hand and detail only) ===
+	-- === ABILITY TEXT (hand and detail) ===
 	if (displaySize == "hand" or displaySize == "detail") and def.abilityText then
 		local abilityLabel = Instance.new("TextLabel")
 		abilityLabel.Name = "AbilityLabel"
@@ -217,9 +235,9 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		abilityLabel.Parent = frame
 
 		if displaySize == "hand" then
-			abilityLabel.TextSize = 11
+			abilityLabel.TextSize = 10
 			abilityLabel.Position = UDim2.new(0.08, 0, 0.68, 0)
-			abilityLabel.Size = UDim2.new(0.84, 0, 0.18, 0)
+			abilityLabel.Size = UDim2.new(0.84, 0, 0.20, 0)
 			abilityLabel.TextTruncate = Enum.TextTruncate.AtEnd
 		else
 			abilityLabel.TextSize = 14
@@ -228,7 +246,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		end
 	end
 
-	-- === STATS (detail only) ===
+	-- === STATS LINE (detail only) ===
 	if displaySize == "detail" then
 		local statsLabel = Instance.new("TextLabel")
 		statsLabel.Name = "StatsLabel"
@@ -247,6 +265,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	return frame
 end
 
+-- Update the power display on an existing card frame
 function CardFrame.updatePower(frame, newPower, basePower)
 	local powerBadge = frame:FindFirstChild("PowerBadge")
 	if powerBadge then
@@ -264,6 +283,7 @@ function CardFrame.updatePower(frame, newPower, basePower)
 	end
 end
 
+-- Create an empty slot placeholder
 function CardFrame.createEmptySlot(displaySize)
 	displaySize = displaySize or "board"
 	local size = SIZE_PRESETS[displaySize]
@@ -274,6 +294,7 @@ function CardFrame.createEmptySlot(displaySize)
 	frame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 	frame.BackgroundTransparency = 0.5
 	frame.BorderSizePixel = 0
+	frame.ZIndex = 3
 
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = Color3.fromRGB(80, 80, 90)
