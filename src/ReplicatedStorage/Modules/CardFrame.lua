@@ -57,7 +57,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	local frame = Instance.new("Frame")
 	frame.Name = "Card_" .. cardID
 	frame.Size = size or UDim2.new(1, 0, 1, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(45, 48, 65)
+	frame.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
 	frame.BorderSizePixel = 0
 
 	local corner = Instance.new("UICorner")
