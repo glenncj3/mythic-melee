@@ -92,19 +92,20 @@ test("CardFrame.create returns a Frame for all cards (detail size)", function()
 	end
 end)
 
-test("CardFrame board size has correct dimensions", function()
+test("CardFrame board size uses scale (fills parent)", function()
 	local frame = CardFrame.create("SPARK", "board")
 	assertNotNil(frame)
-	assertEqual(frame.Size.X.Offset, 60, "board width")
-	assertEqual(frame.Size.Y.Offset, 80, "board height")
+	-- Board cards now use scale sizing (1,0,1,0) to fill their slot
+	assertEqual(frame.Size.X.Scale, 1, "board width scale")
+	assertEqual(frame.Size.Y.Scale, 1, "board height scale")
 	frame:Destroy()
 end)
 
 test("CardFrame hand size has correct dimensions", function()
 	local frame = CardFrame.create("SPARK", "hand")
 	assertNotNil(frame)
-	assertEqual(frame.Size.X.Offset, 90, "hand width")
-	assertEqual(frame.Size.Y.Offset, 120, "hand height")
+	assertEqual(frame.Size.X.Offset, 110, "hand width")
+	assertEqual(frame.Size.Y.Offset, 147, "hand height")
 	frame:Destroy()
 end)
 

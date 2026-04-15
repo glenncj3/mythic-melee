@@ -87,16 +87,16 @@ test("GameConfig.LOCATIONS_PER_GAME is 2", function()
 	assertEqual(GameConfig.LOCATIONS_PER_GAME, 2, "LOCATIONS_PER_GAME")
 end)
 
-test("GameConfig.SLOTS_PER_LOCATION is 6", function()
-	assertEqual(GameConfig.SLOTS_PER_LOCATION, 6, "SLOTS_PER_LOCATION")
+test("GameConfig.SLOTS_PER_LOCATION is 3", function()
+	assertEqual(GameConfig.SLOTS_PER_LOCATION, 3, "SLOTS_PER_LOCATION")
 end)
 
 test("GameConfig.GRID_COLUMNS is 3", function()
 	assertEqual(GameConfig.GRID_COLUMNS, 3, "GRID_COLUMNS")
 end)
 
-test("GameConfig.GRID_ROWS is 2", function()
-	assertEqual(GameConfig.GRID_ROWS, 2, "GRID_ROWS")
+test("GameConfig.GRID_ROWS is 1", function()
+	assertEqual(GameConfig.GRID_ROWS, 1, "GRID_ROWS")
 end)
 
 test("GameConfig.STARTING_HAND_SIZE is 3", function()
@@ -296,7 +296,7 @@ print("\n=== SlotGrid Tests ===")
 
 test("SlotGrid.isValidSlot accepts all grid positions", function()
 	for col = 1, 3 do
-		for row = 1, 2 do
+		for row = 1, 1 do
 			assertTrue(SlotGrid.isValidSlot(col, row),
 				string.format("(%d,%d) should be valid", col, row))
 		end
@@ -307,85 +307,55 @@ test("SlotGrid.isValidSlot rejects out-of-bounds", function()
 	assertTrue(not SlotGrid.isValidSlot(0, 1), "(0,1) should be invalid")
 	assertTrue(not SlotGrid.isValidSlot(4, 1), "(4,1) should be invalid")
 	assertTrue(not SlotGrid.isValidSlot(1, 0), "(1,0) should be invalid")
-	assertTrue(not SlotGrid.isValidSlot(1, 3), "(1,3) should be invalid")
+	assertTrue(not SlotGrid.isValidSlot(1, 2), "(1,2) should be invalid with 1 row")
 	assertTrue(not SlotGrid.isValidSlot(-1, 1), "(-1,1) should be invalid")
 end)
 
-test("SlotGrid.getAllSlots returns 6 slots", function()
-	assertEqual(#SlotGrid.getAllSlots(), 6, "total slots")
+test("SlotGrid.getAllSlots returns 3 slots", function()
+	assertEqual(#SlotGrid.getAllSlots(), 3, "total slots")
 end)
 
--- Adjacency tests per spec diagram:
+-- Adjacency tests for 1x3 grid:
 -- (1,1) <-> (2,1) <-> (3,1)
---   |          |          |
--- (1,2) <-> (2,2) <-> (3,2)
+-- No vertical neighbors with 1 row
 
-test("(1,1) adjacent to (2,1) and (1,2) only", function()
+test("(1,1) adjacent to (2,1) only", function()
 	local adj = SlotGrid.getAdjacent(1, 1)
-	assertEqual(#adj, 2, "(1,1) neighbor count")
+	assertEqual(#adj, 1, "(1,1) neighbor count")
 	assertTrue(tableContainsSlot(adj, 2, 1), "(1,1) -> (2,1)")
-	assertTrue(tableContainsSlot(adj, 1, 2), "(1,1) -> (1,2)")
 end)
 
-test("(2,1) adjacent to (1,1), (3,1), and (2,2)", function()
+test("(2,1) adjacent to (1,1) and (3,1) only", function()
 	local adj = SlotGrid.getAdjacent(2, 1)
-	assertEqual(#adj, 3, "(2,1) neighbor count")
+	assertEqual(#adj, 2, "(2,1) neighbor count")
 	assertTrue(tableContainsSlot(adj, 1, 1), "(2,1) -> (1,1)")
 	assertTrue(tableContainsSlot(adj, 3, 1), "(2,1) -> (3,1)")
-	assertTrue(tableContainsSlot(adj, 2, 2), "(2,1) -> (2,2)")
 end)
 
-test("(3,1) adjacent to (2,1) and (3,2) only", function()
+test("(3,1) adjacent to (2,1) only", function()
 	local adj = SlotGrid.getAdjacent(3, 1)
-	assertEqual(#adj, 2, "(3,1) neighbor count")
+	assertEqual(#adj, 1, "(3,1) neighbor count")
 	assertTrue(tableContainsSlot(adj, 2, 1), "(3,1) -> (2,1)")
-	assertTrue(tableContainsSlot(adj, 3, 2), "(3,1) -> (3,2)")
 end)
 
-test("(1,2) adjacent to (1,1) and (2,2) only", function()
-	local adj = SlotGrid.getAdjacent(1, 2)
-	assertEqual(#adj, 2, "(1,2) neighbor count")
-	assertTrue(tableContainsSlot(adj, 1, 1), "(1,2) -> (1,1)")
-	assertTrue(tableContainsSlot(adj, 2, 2), "(1,2) -> (2,2)")
+test("No vertical adjacency with 1 row grid", function()
+	-- No slot at row 2 should be returned
+	for col = 1, 3 do
+		local adj = SlotGrid.getAdjacent(col, 1)
+		for _, slot in ipairs(adj) do
+			assertTrue(slot[2] == 1, string.format("(%d,1) should not have row-2 neighbor", col))
+		end
+	end
 end)
 
-test("(2,2) adjacent to (2,1), (1,2), and (3,2)", function()
-	local adj = SlotGrid.getAdjacent(2, 2)
-	assertEqual(#adj, 3, "(2,2) neighbor count")
-	assertTrue(tableContainsSlot(adj, 2, 1), "(2,2) -> (2,1)")
-	assertTrue(tableContainsSlot(adj, 1, 2), "(2,2) -> (1,2)")
-	assertTrue(tableContainsSlot(adj, 3, 2), "(2,2) -> (3,2)")
-end)
-
-test("(3,2) adjacent to (3,1) and (2,2) only", function()
-	local adj = SlotGrid.getAdjacent(3, 2)
-	assertEqual(#adj, 2, "(3,2) neighbor count")
-	assertTrue(tableContainsSlot(adj, 3, 1), "(3,2) -> (3,1)")
-	assertTrue(tableContainsSlot(adj, 2, 2), "(3,2) -> (2,2)")
-end)
-
-test("No diagonal adjacency anywhere", function()
-	-- (1,1) should NOT be adjacent to (2,2)
-	local adj11 = SlotGrid.getAdjacent(1, 1)
-	assertTrue(not tableContainsSlot(adj11, 2, 2), "(1,1) should not be adjacent to (2,2)")
-	assertTrue(not tableContainsSlot(adj11, 3, 1), "(1,1) should not be adjacent to (3,1)")
-	assertTrue(not tableContainsSlot(adj11, 3, 2), "(1,1) should not be adjacent to (3,2)")
-end)
-
-test("Corner slots have 2 neighbors, edge slots have 3", function()
-	-- Corners: (1,1), (3,1), (1,2), (3,2)
-	assertEqual(#SlotGrid.getAdjacent(1, 1), 2, "(1,1) corners")
-	assertEqual(#SlotGrid.getAdjacent(3, 1), 2, "(3,1) corners")
-	assertEqual(#SlotGrid.getAdjacent(1, 2), 2, "(1,2) corners")
-	assertEqual(#SlotGrid.getAdjacent(3, 2), 2, "(3,2) corners")
-	-- Edges: (2,1), (2,2)
-	assertEqual(#SlotGrid.getAdjacent(2, 1), 3, "(2,1) edge")
-	assertEqual(#SlotGrid.getAdjacent(2, 2), 3, "(2,2) edge")
+test("End slots have 1 neighbor, center slot has 2", function()
+	assertEqual(#SlotGrid.getAdjacent(1, 1), 1, "(1,1) end")
+	assertEqual(#SlotGrid.getAdjacent(3, 1), 1, "(3,1) end")
+	assertEqual(#SlotGrid.getAdjacent(2, 1), 2, "(2,1) center")
 end)
 
 test("SlotGrid.getRow returns 3 slots", function()
 	assertEqual(#SlotGrid.getRow(1), 3, "row 1 count")
-	assertEqual(#SlotGrid.getRow(2), 3, "row 2 count")
 end)
 
 test("SlotGrid.getRow(1) contains correct slots", function()
@@ -395,16 +365,15 @@ test("SlotGrid.getRow(1) contains correct slots", function()
 	assertTrue(tableContainsSlot(r, 3, 1), "row 1 has (3,1)")
 end)
 
-test("SlotGrid.getColumn returns 2 slots", function()
-	assertEqual(#SlotGrid.getColumn(1), 2, "col 1 count")
-	assertEqual(#SlotGrid.getColumn(2), 2, "col 2 count")
-	assertEqual(#SlotGrid.getColumn(3), 2, "col 3 count")
+test("SlotGrid.getColumn returns 1 slot with 1 row", function()
+	assertEqual(#SlotGrid.getColumn(1), 1, "col 1 count")
+	assertEqual(#SlotGrid.getColumn(2), 1, "col 2 count")
+	assertEqual(#SlotGrid.getColumn(3), 1, "col 3 count")
 end)
 
 test("SlotGrid.getColumn(2) contains correct slots", function()
 	local c = SlotGrid.getColumn(2)
 	assertTrue(tableContainsSlot(c, 2, 1), "col 2 has (2,1)")
-	assertTrue(tableContainsSlot(c, 2, 2), "col 2 has (2,2)")
 end)
 
 -- ============================================================
@@ -503,10 +472,8 @@ local function makeTestState()
 				boards = {
 					[1] = {
 						{ nil, nil, nil },
-						{ nil, nil, nil },
 					},
 					[2] = {
-						{ nil, nil, nil },
 						{ nil, nil, nil },
 					},
 				},
@@ -519,10 +486,8 @@ local function makeTestState()
 				boards = {
 					[1] = {
 						{ nil, nil, nil },
-						{ nil, nil, nil },
 					},
 					[2] = {
-						{ nil, nil, nil },
 						{ nil, nil, nil },
 					},
 				},
@@ -679,7 +644,7 @@ end)
 
 test("Berserker: +1 per empty friendly slot at location", function()
 	local gs = makeTestState()
-	-- Place berserker at (1,1), rest are empty = 5 empty slots
+	-- Place berserker at (1,1), rest are empty = 2 empty slots (1x3 grid)
 	local berserker = makeCard("BERSERKER", 4, 3, 1)
 	gs.players["P1"].boards[1][1][1] = berserker
 
@@ -689,7 +654,7 @@ test("Berserker: +1 per empty friendly slot at location", function()
 	for _, m in ipairs(berserker.powerModifiers) do
 		bmod = bmod + m.amount
 	end
-	assertEqual(bmod, 5, "Berserker should get +5 for 5 empty slots")
+	assertEqual(bmod, 2, "Berserker should get +2 for 2 empty slots")
 end)
 
 test("Wind Dancer: moves to other location", function()
@@ -704,8 +669,8 @@ test("Wind Dancer: moves to other location", function()
 
 	-- Should appear somewhere at location 2
 	local found = false
-	for r = 1, 2 do
-		for c = 1, 3 do
+	for r = 1, GameConfig.GRID_ROWS do
+		for c = 1, GameConfig.GRID_COLUMNS do
 			if gs.players["P1"].boards[2][r][c] then
 				found = true
 			end
@@ -721,9 +686,9 @@ test("Echo: summons 1-Power copy in adjacent empty slot", function()
 
 	AbilityRegistry.resolveOnReveal(gs, echo, "P1", 1, 2, 1)
 
-	-- Check adjacent slots: (1,1), (3,1), (2,2) — one should have a token
+	-- Check adjacent slots: (1,1), (3,1) — one should have a token (1x3 grid, no vertical)
 	local tokenFound = false
-	local adjSlots = { {1,1}, {3,1}, {2,2} }
+	local adjSlots = { {1,1}, {3,1} }
 	for _, slot in ipairs(adjSlots) do
 		local card = gs.players["P1"].boards[1][slot[2]][slot[1]]
 		if card and card.isToken then
@@ -764,34 +729,36 @@ test("Void Walker: destroys cards with 2 or less Power (both sides)", function()
 	gs.players["P2"].boards[1][1][2] = strongEnemy
 
 	local voidWalker = makeCard("VOID_WALKER", 10, 3, 1)
-	gs.players["P1"].boards[1][2][1] = voidWalker  -- at (1,2)
+	gs.players["P1"].boards[1][1][3] = voidWalker  -- at (3,1)
 
-	AbilityRegistry.resolveOnReveal(gs, voidWalker, "P1", 1, 1, 2)
+	AbilityRegistry.resolveOnReveal(gs, voidWalker, "P1", 1, 3, 1)
 
 	-- Weak cards destroyed, strong survives, Void Walker survives
 	assertEqual(gs.players["P1"].boards[1][1][1], nil, "Weak friendly Spark should be destroyed")
 	assertEqual(gs.players["P2"].boards[1][1][1], nil, "Weak enemy Scout should be destroyed")
 	assertTrue(gs.players["P2"].boards[1][1][2] ~= nil, "Strong enemy Dragon should survive")
-	assertTrue(gs.players["P1"].boards[1][2][1] ~= nil, "Void Walker should survive")
+	assertTrue(gs.players["P1"].boards[1][1][3] ~= nil, "Void Walker should survive")
 end)
 
-test("Mystic: +1 to friendly cards in same column", function()
+test("Mystic: +1 to friendly cards in same column (no other cards in 1-row grid)", function()
 	local gs = makeTestState()
-	-- Place a card at (2,2) and Mystic at (2,1) — same column
-	local friendly = makeCard("SPARK", 2, 1, 1)
-	gs.players["P1"].boards[1][2][2] = friendly  -- (2,2) -> boards[1][row=2][col=2]
+	-- With 1 row, each column has only 1 slot, so Mystic can only affect itself
+	-- But Mystic targets "other" cards in the column — none exist
+	-- Place Mystic at (2,1) and a card at (1,1) (different column — should NOT be buffed)
+	local diffCol = makeCard("SPARK", 2, 1, 1)
+	gs.players["P1"].boards[1][1][1] = diffCol  -- (1,1) col 1
 
 	local mystic = makeCard("MYSTIC", 2, 3, 1)
-	gs.players["P1"].boards[1][1][2] = mystic  -- (2,1) -> boards[1][row=1][col=2]
+	gs.players["P1"].boards[1][1][2] = mystic  -- (2,1) col 2
 
 	AbilityRegistry.resolveOnReveal(gs, mystic, "P1", 1, 2, 1)
 
-	-- Spark at (2,2) should have +1
+	-- Spark at col 1 should NOT get +1 (different column)
 	local sparkMod = 0
-	for _, m in ipairs(friendly.powerModifiers) do
+	for _, m in ipairs(diffCol.powerModifiers) do
 		sparkMod = sparkMod + m.amount
 	end
-	assertEqual(sparkMod, 1, "Spark in same column should get +1 from Mystic")
+	assertEqual(sparkMod, 0, "Spark in different column should not get +1 from Mystic")
 end)
 
 test("Ember: -1 to random friendly (not self)", function()
@@ -820,9 +787,9 @@ test("Storm Mage: -2 to ALL enemies at location", function()
 	gs.players["P2"].boards[1][1][2] = e2
 
 	local sm = makeCard("STORM_MAGE", 5, 3, 1)
-	gs.players["P1"].boards[1][2][1] = sm
+	gs.players["P1"].boards[1][1][3] = sm
 
-	AbilityRegistry.resolveOnReveal(gs, sm, "P1", 1, 1, 2)
+	AbilityRegistry.resolveOnReveal(gs, sm, "P1", 1, 3, 1)
 
 	local m1, m2 = 0, 0
 	for _, m in ipairs(e1.powerModifiers) do m1 = m1 + m.amount end
@@ -871,7 +838,7 @@ test("Commander Ongoing: +1 to all other friendlies at location", function()
 	local f1 = makeCard("SPARK", 2, 1, 2)
 	gs.players["P1"].boards[1][1][2] = f1  -- at (2,1)
 	local f2 = makeCard("IRON_GUARD", 3, 1, 3)
-	gs.players["P1"].boards[1][2][1] = f2  -- at (1,2)
+	gs.players["P1"].boards[1][1][3] = f2  -- at (3,1)
 
 	AbilityRegistry.applyOngoing(gs, commander, "P1", 1, 1, 1)
 
@@ -895,16 +862,16 @@ test("Shield Wall Ongoing: +2 to other friendlies in same row", function()
 	local sameRow = makeCard("SPARK", 2, 1, 2)
 	gs.players["P1"].boards[1][1][3] = sameRow  -- at (3,1) row 1
 
-	local diffRow = makeCard("IRON_GUARD", 3, 1, 3)
-	gs.players["P1"].boards[1][2][1] = diffRow  -- at (1,2) row 2
-
 	AbilityRegistry.applyOngoing(gs, sw, "P1", 1, 1, 1)
 
-	local srMod, drMod = 0, 0
+	local srMod = 0
 	for _, m in ipairs(sameRow.powerModifiers) do srMod = srMod + m.amount end
-	for _, m in ipairs(diffRow.powerModifiers) do drMod = drMod + m.amount end
 	assertEqual(srMod, 2, "Same-row card should get +2 from Shield Wall")
-	assertEqual(drMod, 0, "Different-row card should get +0 from Shield Wall")
+
+	-- Shield Wall should NOT buff itself
+	local swMod = 0
+	for _, m in ipairs(sw.powerModifiers) do swMod = swMod + m.amount end
+	assertEqual(swMod, 0, "Shield Wall should not buff itself")
 end)
 
 test("Overlord Ongoing: +1 to all other friendlies at both locations", function()

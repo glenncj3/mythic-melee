@@ -79,7 +79,7 @@ end
 local function makeGameState()
 	local function makeEmptyBoard()
 		local boards = {}
-		for locIdx = 1, 2 do
+		for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
 			boards[locIdx] = {}
 			for row = 1, GameConfig.GRID_ROWS do
 				boards[locIdx][row] = {}
@@ -633,7 +633,7 @@ test("Commander boosts all friendlies at location", function()
 	gs.players["P1"].boards[1][1][2] = spark
 
 	local golem = makeCardState("STONE_GOLEM", 1, 3)
-	gs.players["P1"].boards[1][2][1] = golem
+	gs.players["P1"].boards[1][1][3] = golem
 
 	match:recalculateOngoing()
 
