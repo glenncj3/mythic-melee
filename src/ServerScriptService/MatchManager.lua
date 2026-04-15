@@ -39,8 +39,22 @@ function MatchManager.new(player1, player2, isPlayer2Bot)
 	self.playerIDs = {}
 	self.playerObjects = {}
 
-	local p1ID = tostring(player1)
-	local p2ID = isPlayer2Bot and "BOT" or tostring(player2)
+	-- Use UserId for real players to ensure consistency with RemoteEvent handlers
+	local p1ID
+	if typeof(player1) == "Instance" and player1:IsA("Player") then
+		p1ID = tostring(player1.UserId)
+	else
+		p1ID = tostring(player1)
+	end
+
+	local p2ID
+	if isPlayer2Bot then
+		p2ID = "BOT"
+	elseif typeof(player2) == "Instance" and player2:IsA("Player") then
+		p2ID = tostring(player2.UserId)
+	else
+		p2ID = tostring(player2)
+	end
 
 	self.playerIDs[1] = p1ID
 	self.playerIDs[2] = p2ID
