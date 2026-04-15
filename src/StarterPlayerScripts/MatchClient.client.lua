@@ -1258,14 +1258,8 @@ RevealResultEvent.OnClientEvent:Connect(function(resultData)
 end)
 
 ScoreUpdateEvent.OnClientEvent:Connect(function(scoreData)
-	local myID = tostring(player.UserId)
-	for pid, score in pairs(scoreData.scores) do
-		if pid == myID then
-			myScore = score
-		else
-			oppScore = score
-		end
-	end
+	myScore = scoreData.myScore
+	oppScore = scoreData.oppScore
 	updateScoreDisplay()
 
 	-- Brief score flash animation
@@ -1290,16 +1284,15 @@ GameOverEvent.OnClientEvent:Connect(function(resultData)
 
 	if not gameOverOverlay then return end
 
-	local myID = tostring(player.UserId)
 	local resultLabel = gameOverOverlay:FindFirstChild("ResultLabel")
 	local finalScoreLabel = gameOverOverlay:FindFirstChild("FinalScore")
 
-	if resultData.winner == myID then
+	if resultData.won then
 		if resultLabel then
 			resultLabel.Text = "VICTORY!"
 			resultLabel.TextColor3 = COLORS.victory
 		end
-	elseif resultData.winner == "DRAW" then
+	elseif resultData.draw then
 		if resultLabel then
 			resultLabel.Text = "DRAW"
 			resultLabel.TextColor3 = COLORS.textWhite
@@ -1312,10 +1305,8 @@ GameOverEvent.OnClientEvent:Connect(function(resultData)
 	end
 
 	if finalScoreLabel then
-		local myFinalScore = resultData.finalScores[myID] or 0
-		local oppFinalScore = 0
-		for pid, s in pairs(resultData.finalScores) do
-			if pid ~= myID then oppFinalScore = s end
+		local myFinalScore = resultData.myFinalScore or 0
+		local oppFinalScore = resultData.oppFinalScore or 0
 		end
 		finalScoreLabel.Text = string.format("Final Score: %d - %d  |  Turns: %d",
 			myFinalScore, oppFinalScore, resultData.totalTurns or 0)

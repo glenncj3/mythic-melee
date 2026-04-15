@@ -502,29 +502,18 @@ function MatchManager:sendScoreUpdate()
 	local scoreEvent = Events:FindFirstChild("ScoreUpdate")
 	if not scoreEvent then return end
 
-	local p1ID = self.playerIDs[1]
-	local p2ID = self.playerIDs[2]
-
-	local scoreData = {
-		turn = gs.turn,
-		scores = {
-			[p1ID] = gs.players[p1ID].score,
-			[p2ID] = gs.players[p2ID].score,
-		},
-		locationPower = {},
-	}
-
-	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
-		scoreData.locationPower[locIdx] = {
-			[p1ID] = sumPowerAtLocation(gs, p1ID, locIdx),
-			[p2ID] = sumPowerAtLocation(gs, p2ID, locIdx),
-		}
-	end
-
-	for _, pid in ipairs({p1ID, p2ID}) do
+	-- Send per-player data directly — never use player IDs as table keys
+	-- over RemoteEvents (Roblox converts numeric string keys to numbers)
+	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
 		if pid ~= "BOT" then
 			local player = self.playerObjects[pid]
 			if player and typeof(player) == "Instance" then
+				local opponentID = getOpponentID(gs, pid)
+				local scoreData = {
+					turn = gs.turn,
+					myScore = gs.players[pid].score,
+					oppScore = gs.players[opponentID].score,
+				}
 				scoreEvent:FireClient(player, scoreData)
 			end
 		end
@@ -536,22 +525,21 @@ function MatchManager:sendGameOver(winnerID)
 	local gameOverEvent = Events:FindFirstChild("GameOver")
 	if not gameOverEvent then return end
 
-	local p1ID = self.playerIDs[1]
-	local p2ID = self.playerIDs[2]
-
-	local resultData = {
-		winner = winnerID,
-		finalScores = {
-			[p1ID] = gs.players[p1ID].score,
-			[p2ID] = gs.players[p2ID].score,
-		},
-		totalTurns = gs.turn,
-	}
-
-	for _, pid in ipairs({p1ID, p2ID}) do
+	-- Send per-player data directly to avoid RemoteEvent key type conversion
+	for _, pid in ipairs({self.playerIDs[1], self.playerIDs[2]}) do
 		if pid ~= "BOT" then
 			local player = self.playerObjects[pid]
 			if player and typeof(player) == "Instance" then
+				local opponentID = getOpponentID(gs, pid)
+				local isWinner = (winnerID == pid)
+				local isDraw = (winnerID == "DRAW")
+				local resultData = {
+					won = isWinner,
+					draw = isDraw,
+					myFinalScore = gs.players[pid].score,
+					oppFinalScore = gs.players[opponentID].score,
+					totalTurns = gs.turn,
+				}
 				gameOverEvent:FireClient(player, resultData)
 			end
 		end
