@@ -634,7 +634,7 @@ local function createMatchUI()
 	timerLabel.ZIndex = 4
 	timerLabel.Parent = topRow
 
-	-- Hand area (2 columns x 3 rows grid, max 6 cards)
+	-- Hand area (2 columns x 3 rows, manually positioned, max 6 cards)
 	handFrame = Instance.new("Frame")
 	handFrame.Name = "HandArea"
 	handFrame.Size = UDim2.new(1, -12, 1, -112)
@@ -643,17 +643,6 @@ local function createMatchUI()
 	handFrame.BorderSizePixel = 0
 	handFrame.ZIndex = 3
 	handFrame.Parent = sidebar
-
-	local handGrid = Instance.new("UIGridLayout")
-	-- Cell is portrait: width ~33% of container, height ~32% — produces roughly 3:4 ratio
-	handGrid.CellSize = UDim2.new(0.47, 0, 0.31, 0)
-	handGrid.CellPadding = UDim2.new(0.03, 0, 0.015, 0)
-	handGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	handGrid.VerticalAlignment = Enum.VerticalAlignment.Top
-	handGrid.SortOrder = Enum.SortOrder.LayoutOrder
-	handGrid.FillDirection = Enum.FillDirection.Horizontal
-	handGrid.FillDirectionMaxCells = 2
-	handGrid.Parent = handFrame
 
 	-- Confirm button (bottom of sidebar)
 	confirmButton = Instance.new("TextButton")
@@ -1444,6 +1433,27 @@ local function renderHand()
 
 	if not handFrame then return end
 
+	-- Calculate card positions for 2x3 grid manually
+	local cols = 2
+	local rows = 3
+	local padX = 6
+	local padY = 6
+	local handW = handFrame.AbsoluteSize.X
+	local handH = handFrame.AbsoluteSize.Y
+	-- Fallback if AbsoluteSize not ready
+	if handW < 10 then handW = 300 end
+	if handH < 10 then handH = 700 end
+
+	local cardW = math.floor((handW - padX * (cols + 1)) / cols)
+	local cardH = math.floor(cardW * 4 / 3)  -- 3:4 portrait
+	-- If cards are too tall for 3 rows, shrink based on height
+	local maxCardH = math.floor((handH - padY * (rows + 1)) / rows)
+	if cardH > maxCardH then
+		cardH = maxCardH
+		cardW = math.floor(cardH * 3 / 4)
+	end
+
+	local slotIndex = 0
 	for i, cardID in ipairs(myHand) do
 		local isPending = false
 		for _, play in ipairs(pendingPlays) do
@@ -1460,10 +1470,20 @@ local function renderHand()
 		local available = myEnergy - energySpent
 		local canAfford = def.cost <= available
 
-		-- Create card at "board" size — grid cell controls dimensions
-		local cardF = CardFrame.create(cardID, "board")
+		-- Position in 2-column grid
+		local col = slotIndex % cols
+		local row = math.floor(slotIndex / cols)
+		slotIndex = slotIndex + 1
+		if row >= rows then break end  -- max 6 visible cards
+
+		local xPos = padX + col * (cardW + padX)
+		local yPos = padY + row * (cardH + padY)
+
+		local cardF = CardFrame.create(cardID, "hand")
 		if cardF then
-			cardF.LayoutOrder = i
+			-- Set explicit pixel size and position (no layout objects)
+			cardF.Size = UDim2.new(0, cardW, 0, cardH)
+			cardF.Position = UDim2.new(0, xPos, 0, yPos)
 
 			-- Unaffordable cards: dim
 			if not canAfford then
@@ -1486,7 +1506,7 @@ local function renderHand()
 				onHandCardClicked(cID, cardIndex)
 			end)
 
-			-- Highlight if selected — bright green border (grid controls position, no offset)
+			-- Highlight if selected — bright green border
 			if selectedCardID == cardID and selectedCardIndex == i then
 				local selStroke = cardF:FindFirstChild("RarityStroke")
 				if selStroke then
