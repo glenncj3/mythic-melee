@@ -1482,7 +1482,7 @@ local function renderHand()
 		local def2 = CardDatabase[cardID]
 		local artCol = def2 and def2.artColor or Color3.fromRGB(128, 128, 128)
 
-		-- Build card INLINE (no CardFrame module) to debug rendering
+		-- Build card inline — ZIndex >= 3 required (sidebar is ZIndex=2)
 		local cardF = Instance.new("TextButton")
 		cardF.Name = "HandCard_" .. cardID
 		cardF.Size = UDim2.new(0, cardW, 0, cardH)
@@ -1492,6 +1492,7 @@ local function renderHand()
 		cardF.BorderSizePixel = 0
 		cardF.Text = ""
 		cardF.AutoButtonColor = false
+		cardF.ZIndex = 3
 		cardF.Parent = handFrame
 
 		local cardCorner = Instance.new("UICorner")
@@ -1512,6 +1513,7 @@ local function renderHand()
 		art.BackgroundColor3 = artCol
 		art.BackgroundTransparency = 0
 		art.BorderSizePixel = 0
+		art.ZIndex = 3
 		art.Parent = cardF
 
 		local artC = Instance.new("UICorner")
@@ -1524,7 +1526,7 @@ local function renderHand()
 		costB.Position = UDim2.new(0, 3, 0, 3)
 		costB.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
 		costB.BorderSizePixel = 0
-		costB.ZIndex = 2
+		costB.ZIndex = 4
 		costB.Parent = cardF
 		Instance.new("UICorner", costB).CornerRadius = UDim.new(1, 0)
 		local costT = Instance.new("TextLabel")
@@ -1534,7 +1536,7 @@ local function renderHand()
 		costT.TextColor3 = Color3.fromRGB(255, 255, 255)
 		costT.TextScaled = true
 		costT.Font = Enum.Font.GothamBold
-		costT.ZIndex = 3
+		costT.ZIndex = 5
 		costT.Parent = costB
 
 		-- Power badge (gold, top-right)
@@ -1544,7 +1546,7 @@ local function renderHand()
 		powB.Position = UDim2.new(1, -3, 0, 3)
 		powB.BackgroundColor3 = Color3.fromRGB(200, 160, 40)
 		powB.BorderSizePixel = 0
-		powB.ZIndex = 2
+		powB.ZIndex = 4
 		powB.Parent = cardF
 		Instance.new("UICorner", powB).CornerRadius = UDim.new(1, 0)
 		local powT = Instance.new("TextLabel")
@@ -1554,7 +1556,7 @@ local function renderHand()
 		powT.TextColor3 = Color3.fromRGB(255, 255, 255)
 		powT.TextScaled = true
 		powT.Font = Enum.Font.GothamBold
-		powT.ZIndex = 3
+		powT.ZIndex = 5
 		powT.Parent = powB
 
 		-- Name label
@@ -1567,6 +1569,7 @@ local function renderHand()
 		nameL.TextSize = 13
 		nameL.Font = Enum.Font.GothamBold
 		nameL.TextXAlignment = Enum.TextXAlignment.Left
+		nameL.ZIndex = 4
 		nameL.Parent = cardF
 
 		-- Unaffordable: dim

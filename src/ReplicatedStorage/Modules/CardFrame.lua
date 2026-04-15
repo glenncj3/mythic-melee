@@ -57,8 +57,9 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	local frame = Instance.new("Frame")
 	frame.Name = "Card_" .. cardID
 	frame.Size = size or UDim2.new(1, 0, 1, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
+	frame.BackgroundColor3 = Color3.fromRGB(50, 55, 75)
 	frame.BorderSizePixel = 0
+	frame.ZIndex = 3
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 6)
@@ -75,6 +76,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	artFrame.Name = "Art"
 	artFrame.BackgroundColor3 = artColor
 	artFrame.BorderSizePixel = 0
+	artFrame.ZIndex = 3
 	artFrame.Parent = frame
 
 	local artCorner = Instance.new("UICorner")
@@ -100,7 +102,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	costBadge.Position = UDim2.new(0, 3, 0, 3)
 	costBadge.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
 	costBadge.BorderSizePixel = 0
-	costBadge.ZIndex = 2
+	costBadge.ZIndex = 4
 	costBadge.Parent = frame
 
 	local costCorner = Instance.new("UICorner")
@@ -120,7 +122,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	costLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	costLabel.TextScaled = true
 	costLabel.Font = Enum.Font.GothamBold
-	costLabel.ZIndex = 3
+	costLabel.ZIndex = 5
 	costLabel.Parent = costBadge
 
 	-- === POWER BADGE (gold circle, top-right, offset positioning) ===
@@ -131,7 +133,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	powerBadge.Position = UDim2.new(1, -3, 0, 3)
 	powerBadge.BackgroundColor3 = Color3.fromRGB(200, 160, 40)
 	powerBadge.BorderSizePixel = 0
-	powerBadge.ZIndex = 2
+	powerBadge.ZIndex = 4
 	powerBadge.Parent = frame
 
 	local powerCorner = Instance.new("UICorner")
@@ -151,7 +153,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	powerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	powerLabel.TextScaled = true
 	powerLabel.Font = Enum.Font.GothamBold
-	powerLabel.ZIndex = 3
+	powerLabel.ZIndex = 5
 	powerLabel.Parent = powerBadge
 
 	-- === ABILITY PIP (small colored dot below art) ===
@@ -168,7 +170,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 			pip.Position = UDim2.new(0.92, 0, 0.58, 0)
 			pip.BackgroundColor3 = pipColor
 			pip.BorderSizePixel = 0
-			pip.ZIndex = 2
+			pip.ZIndex = 4
 			pip.Parent = frame
 
 			local pipCorner = Instance.new("UICorner")
@@ -186,6 +188,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		nameLabel.Font = Enum.Font.GothamBold
 		nameLabel.Text = def.name
 		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		nameLabel.ZIndex = 4
 		nameLabel.Parent = frame
 
 		if displaySize == "hand" then
@@ -210,6 +213,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		abilityLabel.TextWrapped = true
 		abilityLabel.TextXAlignment = Enum.TextXAlignment.Left
 		abilityLabel.TextYAlignment = Enum.TextYAlignment.Top
+		abilityLabel.ZIndex = 4
 		abilityLabel.Parent = frame
 
 		if displaySize == "hand" then
@@ -236,6 +240,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		statsLabel.TextXAlignment = Enum.TextXAlignment.Left
 		statsLabel.Position = UDim2.new(0.08, 0, 0.89, 0)
 		statsLabel.Size = UDim2.new(0.84, 0, 0.08, 0)
+		statsLabel.ZIndex = 4
 		statsLabel.Parent = frame
 	end
 
