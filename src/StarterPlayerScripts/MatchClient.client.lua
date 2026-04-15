@@ -1479,44 +1479,115 @@ local function renderHand()
 		local xPos = padX + col * (cardW + padX)
 		local yPos = padY + row * (cardH + padY)
 
-		local cardF = CardFrame.create(cardID, "hand")
-		if cardF then
-			-- Set explicit pixel size and position (no layout objects)
-			cardF.Size = UDim2.new(0, cardW, 0, cardH)
-			cardF.Position = UDim2.new(0, xPos, 0, yPos)
+		local def2 = CardDatabase[cardID]
+		local artCol = def2 and def2.artColor or Color3.fromRGB(128, 128, 128)
 
-			-- Unaffordable cards: dim
-			if not canAfford then
-				cardF.BackgroundTransparency = 0.4
-			end
+		-- Build card INLINE (no CardFrame module) to debug rendering
+		local cardF = Instance.new("TextButton")
+		cardF.Name = "HandCard_" .. cardID
+		cardF.Size = UDim2.new(0, cardW, 0, cardH)
+		cardF.Position = UDim2.new(0, xPos, 0, yPos)
+		cardF.BackgroundColor3 = Color3.fromRGB(50, 55, 75)
+		cardF.BackgroundTransparency = 0
+		cardF.BorderSizePixel = 0
+		cardF.Text = ""
+		cardF.AutoButtonColor = false
+		cardF.Parent = handFrame
 
-			cardF.Parent = handFrame
+		local cardCorner = Instance.new("UICorner")
+		cardCorner.CornerRadius = UDim.new(0, 6)
+		cardCorner.Parent = cardF
 
-			local clickArea = Instance.new("TextButton")
-			clickArea.Name = "ClickArea"
-			clickArea.Size = UDim2.new(1, 0, 1, 0)
-			clickArea.BackgroundTransparency = 1
-			clickArea.Text = ""
-			clickArea.ZIndex = 5
-			clickArea.Parent = cardF
+		local cardStroke = Instance.new("UIStroke")
+		cardStroke.Name = "RarityStroke"
+		cardStroke.Color = Color3.fromRGB(200, 200, 200)
+		cardStroke.Thickness = 2
+		cardStroke.Parent = cardF
 
-			local cardIndex = i
-			local cID = cardID
-			clickArea.MouseButton1Click:Connect(function()
-				onHandCardClicked(cID, cardIndex)
-			end)
+		-- Art area — bright colored rectangle
+		local art = Instance.new("Frame")
+		art.Name = "Art"
+		art.Size = UDim2.new(0.9, 0, 0.5, 0)
+		art.Position = UDim2.new(0.05, 0, 0.05, 0)
+		art.BackgroundColor3 = artCol
+		art.BackgroundTransparency = 0
+		art.BorderSizePixel = 0
+		art.Parent = cardF
 
-			-- Highlight if selected — bright green border
-			if selectedCardID == cardID and selectedCardIndex == i then
-				local selStroke = cardF:FindFirstChild("RarityStroke")
-				if selStroke then
-					selStroke.Color = COLORS.slotHighlight
-					selStroke.Thickness = 4
-				end
-			end
+		local artC = Instance.new("UICorner")
+		artC.CornerRadius = UDim.new(0, 4)
+		artC.Parent = art
 
-			table.insert(handCardFrames, cardF)
+		-- Cost badge (blue, top-left)
+		local costB = Instance.new("Frame")
+		costB.Size = UDim2.new(0, 28, 0, 28)
+		costB.Position = UDim2.new(0, 3, 0, 3)
+		costB.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+		costB.BorderSizePixel = 0
+		costB.ZIndex = 2
+		costB.Parent = cardF
+		Instance.new("UICorner", costB).CornerRadius = UDim.new(1, 0)
+		local costT = Instance.new("TextLabel")
+		costT.Size = UDim2.new(1, 0, 1, 0)
+		costT.BackgroundTransparency = 1
+		costT.Text = tostring(def.cost)
+		costT.TextColor3 = Color3.fromRGB(255, 255, 255)
+		costT.TextScaled = true
+		costT.Font = Enum.Font.GothamBold
+		costT.ZIndex = 3
+		costT.Parent = costB
+
+		-- Power badge (gold, top-right)
+		local powB = Instance.new("Frame")
+		powB.Size = UDim2.new(0, 28, 0, 28)
+		powB.AnchorPoint = Vector2.new(1, 0)
+		powB.Position = UDim2.new(1, -3, 0, 3)
+		powB.BackgroundColor3 = Color3.fromRGB(200, 160, 40)
+		powB.BorderSizePixel = 0
+		powB.ZIndex = 2
+		powB.Parent = cardF
+		Instance.new("UICorner", powB).CornerRadius = UDim.new(1, 0)
+		local powT = Instance.new("TextLabel")
+		powT.Size = UDim2.new(1, 0, 1, 0)
+		powT.BackgroundTransparency = 1
+		powT.Text = tostring(def.power)
+		powT.TextColor3 = Color3.fromRGB(255, 255, 255)
+		powT.TextScaled = true
+		powT.Font = Enum.Font.GothamBold
+		powT.ZIndex = 3
+		powT.Parent = powB
+
+		-- Name label
+		local nameL = Instance.new("TextLabel")
+		nameL.Size = UDim2.new(0.84, 0, 0.12, 0)
+		nameL.Position = UDim2.new(0.08, 0, 0.57, 0)
+		nameL.BackgroundTransparency = 1
+		nameL.Text = def.name
+		nameL.TextColor3 = Color3.fromRGB(255, 255, 255)
+		nameL.TextSize = 13
+		nameL.Font = Enum.Font.GothamBold
+		nameL.TextXAlignment = Enum.TextXAlignment.Left
+		nameL.Parent = cardF
+
+		-- Unaffordable: dim
+		if not canAfford then
+			cardF.BackgroundTransparency = 0.4
 		end
+
+		-- Click handler (card IS the button)
+		local cardIndex = i
+		local cID = cardID
+		cardF.MouseButton1Click:Connect(function()
+			onHandCardClicked(cID, cardIndex)
+		end)
+
+		-- Highlight if selected
+		if selectedCardID == cardID and selectedCardIndex == i then
+			cardStroke.Color = COLORS.slotHighlight
+			cardStroke.Thickness = 4
+		end
+
+		table.insert(handCardFrames, cardF)
 	end
 end
 
