@@ -514,10 +514,10 @@ local function createMatchUI()
 	centerTick.ZIndex = 5
 	centerTick.Parent = progressContainer
 
-	-- === BOARD AREA (locations) ===
+	-- === BOARD AREA (locations, left 65%) ===
 	boardFrame = Instance.new("Frame")
 	boardFrame.Name = "BoardArea"
-	boardFrame.Size = UDim2.new(1, -16, 0.60, -8)
+	boardFrame.Size = UDim2.new(0.65, -8, 0.95, -8)
 	boardFrame.Position = UDim2.new(0, 8, 0.05, 0)
 	boardFrame.BackgroundTransparency = 1
 	boardFrame.ZIndex = 2
@@ -526,7 +526,7 @@ local function createMatchUI()
 	local boardLayout = Instance.new("UIListLayout")
 	boardLayout.FillDirection = Enum.FillDirection.Horizontal
 	boardLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	boardLayout.Padding = UDim.new(0, 10)
+	boardLayout.Padding = UDim.new(0, 8)
 	boardLayout.Parent = boardFrame
 
 	locationFrames = {}
@@ -534,57 +534,54 @@ local function createMatchUI()
 		locationFrames[locIdx] = createLocationPanel(locIdx, boardFrame)
 	end
 
-	-- === BOTTOM AREA (energy, hand, controls) ===
-	local bottomFrame = Instance.new("Frame")
-	bottomFrame.Name = "BottomArea"
-	bottomFrame.Size = UDim2.new(1, 0, 0.32, 0)
-	bottomFrame.Position = UDim2.new(0, 0, 0.68, 0)
-	bottomFrame.BackgroundColor3 = COLORS.bottomBg
-	bottomFrame.BorderSizePixel = 0
-	bottomFrame.ZIndex = 2
-	bottomFrame.Parent = bg
+	-- === SIDEBAR (right 35% — energy, timer, hand, confirm) ===
+	local sidebar = Instance.new("Frame")
+	sidebar.Name = "Sidebar"
+	sidebar.Size = UDim2.new(0.35, -12, 0.95, -8)
+	sidebar.Position = UDim2.new(0.65, 4, 0.05, 0)
+	sidebar.BackgroundColor3 = COLORS.bottomBg
+	sidebar.BorderSizePixel = 0
+	sidebar.ZIndex = 2
+	sidebar.Parent = bg
 
-	-- Hand tray top-edge highlight (shelf look)
-	local shelfHighlight = Instance.new("Frame")
-	shelfHighlight.Name = "ShelfHighlight"
-	shelfHighlight.Size = UDim2.new(1, 0, 0, 1)
-	shelfHighlight.Position = UDim2.new(0, 0, 0, 0)
-	shelfHighlight.BackgroundColor3 = Color3.fromRGB(50, 55, 70)
-	shelfHighlight.BorderSizePixel = 0
-	shelfHighlight.ZIndex = 3
-	shelfHighlight.Parent = bottomFrame
+	local sidebarCorner = Instance.new("UICorner")
+	sidebarCorner.CornerRadius = UDim.new(0, 8)
+	sidebarCorner.Parent = sidebar
 
-	-- Control row (energy, timer, confirm)
-	local controlRow = Instance.new("Frame")
-	controlRow.Name = "ControlRow"
-	controlRow.Size = UDim2.new(1, 0, 0, 48)
-	controlRow.Position = UDim2.new(0, 0, 0, 4)
-	controlRow.BackgroundTransparency = 1
-	controlRow.ZIndex = 3
-	controlRow.Parent = bottomFrame
+	local sidebarStroke = Instance.new("UIStroke")
+	sidebarStroke.Color = COLORS.panelBorder
+	sidebarStroke.Thickness = 1
+	sidebarStroke.Parent = sidebar
 
-	-- Energy indicator (circular, Phase 1F)
+	-- Top row: Energy + Timer
+	local topRow = Instance.new("Frame")
+	topRow.Name = "TopRow"
+	topRow.Size = UDim2.new(1, 0, 0, 50)
+	topRow.Position = UDim2.new(0, 0, 0, 6)
+	topRow.BackgroundTransparency = 1
+	topRow.ZIndex = 3
+	topRow.Parent = sidebar
+
+	-- Energy indicator (circular)
 	energyFrame = Instance.new("Frame")
 	energyFrame.Name = "EnergyIndicator"
 	energyFrame.Size = UDim2.new(0, 44, 0, 44)
-	energyFrame.Position = UDim2.new(0.04, 0, 0, 0)
+	energyFrame.Position = UDim2.new(0, 10, 0, 3)
 	energyFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 50)
 	energyFrame.BorderSizePixel = 0
 	energyFrame.ZIndex = 4
-	energyFrame.Parent = controlRow
+	energyFrame.Parent = topRow
 
 	local energyCorner = Instance.new("UICorner")
 	energyCorner.CornerRadius = UDim.new(1, 0)
 	energyCorner.Parent = energyFrame
 
-	-- Energy ring
 	local energyRing = Instance.new("UIStroke")
 	energyRing.Name = "EnergyRing"
 	energyRing.Color = COLORS.energyColor
 	energyRing.Thickness = 3
 	energyRing.Parent = energyFrame
 
-	-- Energy number (large centered)
 	energyNumberLabel = Instance.new("TextLabel")
 	energyNumberLabel.Name = "EnergyNumber"
 	energyNumberLabel.Size = UDim2.new(1, 0, 0.65, 0)
@@ -597,7 +594,6 @@ local function createMatchUI()
 	energyNumberLabel.ZIndex = 5
 	energyNumberLabel.Parent = energyFrame
 
-	-- Energy max label (small below)
 	energyMaxLabel = Instance.new("TextLabel")
 	energyMaxLabel.Name = "EnergyMax"
 	energyMaxLabel.Size = UDim2.new(1, 0, 0.3, 0)
@@ -610,11 +606,10 @@ local function createMatchUI()
 	energyMaxLabel.ZIndex = 5
 	energyMaxLabel.Parent = energyFrame
 
-	-- Energy preview (shows cost deduction when card selected)
 	energyPreviewLabel = Instance.new("TextLabel")
 	energyPreviewLabel.Name = "EnergyPreview"
 	energyPreviewLabel.Size = UDim2.new(0, 40, 0, 16)
-	energyPreviewLabel.Position = UDim2.new(0.04, 48, 0, 28)
+	energyPreviewLabel.Position = UDim2.new(0, 58, 0, 30)
 	energyPreviewLabel.BackgroundTransparency = 1
 	energyPreviewLabel.Text = ""
 	energyPreviewLabel.TextColor3 = Color3.fromRGB(255, 180, 40)
@@ -623,25 +618,55 @@ local function createMatchUI()
 	energyPreviewLabel.TextXAlignment = Enum.TextXAlignment.Left
 	energyPreviewLabel.Visible = false
 	energyPreviewLabel.ZIndex = 5
-	energyPreviewLabel.Parent = controlRow
+	energyPreviewLabel.Parent = topRow
 
 	timerLabel = Instance.new("TextLabel")
 	timerLabel.Name = "TimerLabel"
-	timerLabel.Size = UDim2.new(0.16, 0, 1, 0)
-	timerLabel.Position = UDim2.new(0.42, 0, 0, 0)
+	timerLabel.Size = UDim2.new(0.4, 0, 1, 0)
+	timerLabel.AnchorPoint = Vector2.new(1, 0)
+	timerLabel.Position = UDim2.new(1, -6, 0, 0)
 	timerLabel.BackgroundTransparency = 1
 	timerLabel.Text = ""
 	timerLabel.TextColor3 = COLORS.timerNormal
-	timerLabel.TextSize = 20
+	timerLabel.TextSize = 22
 	timerLabel.Font = Enum.Font.GothamBold
+	timerLabel.TextXAlignment = Enum.TextXAlignment.Right
 	timerLabel.ZIndex = 4
-	timerLabel.Parent = controlRow
+	timerLabel.Parent = topRow
 
-	-- Confirm button (44px height for touch targets)
+	-- Hand area (vertical scroll of portrait cards)
+	handFrame = Instance.new("ScrollingFrame")
+	handFrame.Name = "HandArea"
+	handFrame.Size = UDim2.new(1, -16, 1, -120)
+	handFrame.Position = UDim2.new(0, 8, 0, 58)
+	handFrame.BackgroundTransparency = 1
+	handFrame.BorderSizePixel = 0
+	handFrame.ScrollBarThickness = 4
+	handFrame.ScrollBarImageColor3 = COLORS.textGray
+	handFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+	handFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	handFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	handFrame.ZIndex = 3
+	handFrame.Parent = sidebar
+
+	local handLayout = Instance.new("UIListLayout")
+	handLayout.FillDirection = Enum.FillDirection.Vertical
+	handLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	handLayout.Padding = UDim.new(0, 6)
+	handLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	handLayout.Parent = handFrame
+
+	local handPadding = Instance.new("UIPadding")
+	handPadding.PaddingTop = UDim.new(0, 4)
+	handPadding.PaddingBottom = UDim.new(0, 4)
+	handPadding.Parent = handFrame
+
+	-- Confirm button (bottom of sidebar)
 	confirmButton = Instance.new("TextButton")
 	confirmButton.Name = "ConfirmButton"
-	confirmButton.Size = UDim2.new(0.22, 0, 0, 44)
-	confirmButton.Position = UDim2.new(0.74, 0, 0, 0)
+	confirmButton.Size = UDim2.new(1, -16, 0, 44)
+	confirmButton.AnchorPoint = Vector2.new(0, 1)
+	confirmButton.Position = UDim2.new(0, 8, 1, -6)
 	confirmButton.BackgroundColor3 = COLORS.confirm
 	confirmButton.BorderSizePixel = 0
 	confirmButton.Text = "Confirm"
@@ -649,13 +674,12 @@ local function createMatchUI()
 	confirmButton.TextSize = 18
 	confirmButton.Font = Enum.Font.GothamBold
 	confirmButton.ZIndex = 4
-	confirmButton.Parent = controlRow
+	confirmButton.Parent = sidebar
 
 	local confirmCorner = Instance.new("UICorner")
 	confirmCorner.CornerRadius = UDim.new(0, 8)
 	confirmCorner.Parent = confirmButton
 
-	-- Confirm button hover/press effects (Phase 3H)
 	confirmButton.MouseEnter:Connect(function()
 		if submitted then return end
 		playTween("confirmHover", confirmButton,
@@ -672,29 +696,15 @@ local function createMatchUI()
 		)
 	end)
 
-	confirmButton.MouseButton1Down:Connect(function()
-		if submitted then return end
-		playTween("confirmDown", confirmButton,
-			TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{ Size = UDim2.new(0.212, 0, 0, 42) }
-		)
-	end)
-
-	confirmButton.MouseButton1Up:Connect(function()
-		playTween("confirmUp", confirmButton,
-			TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{ Size = UDim2.new(0.22, 0, 0, 44) }
-		)
-	end)
-
 	confirmButton.MouseButton1Click:Connect(function()
 		onConfirmClicked()
 	end)
 
 	waitingLabel = Instance.new("TextLabel")
 	waitingLabel.Name = "WaitingLabel"
-	waitingLabel.Size = UDim2.new(0.22, 0, 0, 44)
-	waitingLabel.Position = UDim2.new(0.74, 0, 0, 0)
+	waitingLabel.Size = UDim2.new(1, -16, 0, 44)
+	waitingLabel.AnchorPoint = Vector2.new(0, 1)
+	waitingLabel.Position = UDim2.new(0, 8, 1, -6)
 	waitingLabel.BackgroundColor3 = COLORS.confirmDisabled
 	waitingLabel.BorderSizePixel = 0
 	waitingLabel.Text = "Waiting..."
@@ -703,49 +713,11 @@ local function createMatchUI()
 	waitingLabel.Font = Enum.Font.GothamBold
 	waitingLabel.Visible = false
 	waitingLabel.ZIndex = 4
-	waitingLabel.Parent = controlRow
+	waitingLabel.Parent = sidebar
 
 	local waitCorner = Instance.new("UICorner")
 	waitCorner.CornerRadius = UDim.new(0, 8)
 	waitCorner.Parent = waitingLabel
-
-	-- Hand area (scrollable shelf)
-	handFrame = Instance.new("ScrollingFrame")
-	handFrame.Name = "HandArea"
-	handFrame.Size = UDim2.new(0.94, 0, 0, 157)
-	handFrame.Position = UDim2.new(0.03, 0, 0, 52)
-	handFrame.BackgroundTransparency = 1
-	handFrame.BorderSizePixel = 0
-	handFrame.ScrollBarThickness = 4
-	handFrame.ScrollBarImageColor3 = COLORS.textGray
-	handFrame.ScrollingDirection = Enum.ScrollingDirection.X
-	handFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	handFrame.AutomaticCanvasSize = Enum.AutomaticSize.X
-	handFrame.ZIndex = 3
-	handFrame.Parent = bottomFrame
-
-	local handCorner = Instance.new("UICorner")
-	handCorner.CornerRadius = UDim.new(0, 4)
-	handCorner.Parent = handFrame
-
-	local handLayout = Instance.new("UIListLayout")
-	handLayout.FillDirection = Enum.FillDirection.Horizontal
-	handLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	handLayout.Padding = UDim.new(0, 8)
-	handLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	handLayout.Parent = handFrame
-
-	local handPadding = Instance.new("UIPadding")
-	handPadding.PaddingLeft = UDim.new(0, 6)
-	handPadding.PaddingRight = UDim.new(0, 6)
-	handPadding.PaddingTop = UDim.new(0, 4)
-	handPadding.PaddingBottom = UDim.new(0, 4)
-	handPadding.Parent = handFrame
-
-	-- Add extra bottom padding on mobile for home indicator
-	if isMobile() then
-		handPadding.PaddingBottom = UDim.new(0, 12)
-	end
 
 	-- Timer urgency vignette (Phase 3E)
 	vignetteFrame = Instance.new("Frame")
@@ -968,16 +940,27 @@ function createLocationPanel(locIdx, parent)
 end
 
 function createSlotGrid(parent, locIdx, isMine)
+	-- Use UIListLayout to center portrait slots horizontally
+	local gridLayout = Instance.new("UIListLayout")
+	gridLayout.FillDirection = Enum.FillDirection.Horizontal
+	gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	gridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	gridLayout.Padding = UDim.new(0.02, 0)
+	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	gridLayout.Parent = parent
+
+	local gridPadding = Instance.new("UIPadding")
+	gridPadding.PaddingTop = UDim.new(0.02, 0)
+	gridPadding.PaddingBottom = UDim.new(0.02, 0)
+	gridPadding.Parent = parent
+
 	for row = 1, GameConfig.GRID_ROWS do
 		for col = 1, GameConfig.GRID_COLUMNS do
 			local slotFrame = Instance.new("TextButton")
 			slotFrame.Name = string.format("Slot_%d_%d", col, row)
-			local padX = 0.015
-			local padY = 0.03
-			local slotW = (1 - padX * (GameConfig.GRID_COLUMNS + 1)) / GameConfig.GRID_COLUMNS
-			local slotH = (1 - padY * (GameConfig.GRID_ROWS + 1)) / GameConfig.GRID_ROWS
-			slotFrame.Size = UDim2.new(slotW, 0, slotH, 0)
-			slotFrame.Position = UDim2.new(padX + (col-1) * (slotW + padX), 0, padY + (row-1) * (slotH + padY), 0)
+			slotFrame.LayoutOrder = (row - 1) * GameConfig.GRID_COLUMNS + col
+			-- Height fills the grid, width set by aspect ratio constraint
+			slotFrame.Size = UDim2.new(0.3, 0, 0.96, 0)
 			slotFrame.BackgroundColor3 = isMine and COLORS.slotEmpty or COLORS.slotEmptyOpp
 			slotFrame.BackgroundTransparency = 0.3
 			slotFrame.BorderSizePixel = 0
@@ -988,6 +971,12 @@ function createSlotGrid(parent, locIdx, isMine)
 			local slotCorner = Instance.new("UICorner")
 			slotCorner.CornerRadius = UDim.new(0, 5)
 			slotCorner.Parent = slotFrame
+
+			-- Force portrait 3:4 aspect ratio
+			local aspectConstraint = Instance.new("UIAspectRatioConstraint")
+			aspectConstraint.AspectRatio = 3 / 4
+			aspectConstraint.DominantAxis = Enum.DominantAxis.Height
+			aspectConstraint.Parent = slotFrame
 
 			local slotStroke = Instance.new("UIStroke")
 			slotStroke.Name = "SlotStroke"

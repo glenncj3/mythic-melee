@@ -101,11 +101,14 @@ test("CardFrame board size uses scale (fills parent)", function()
 	frame:Destroy()
 end)
 
-test("CardFrame hand size has correct dimensions", function()
+test("CardFrame hand size uses scale with aspect ratio constraint", function()
 	local frame = CardFrame.create("SPARK", "hand")
 	assertNotNil(frame)
-	assertEqual(frame.Size.X.Offset, 110, "hand width")
-	assertEqual(frame.Size.Y.Offset, 147, "hand height")
+	-- Hand cards fill parent width with 3:4 aspect ratio constraint
+	assertEqual(frame.Size.X.Scale, 1, "hand width scale")
+	local aspect = frame:FindFirstChildWhichIsA("UIAspectRatioConstraint")
+	assertNotNil(aspect, "hand card should have UIAspectRatioConstraint")
+	assertTrue(math.abs(aspect.AspectRatio - 0.75) < 0.01, "aspect ratio should be 3:4")
 	frame:Destroy()
 end)
 

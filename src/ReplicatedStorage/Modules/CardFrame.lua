@@ -48,8 +48,10 @@ local ABILITY_PIP_COLORS = {
 }
 
 -- Size presets { width, height }
+-- Board and hand cards use scale sizing (fill parent) with UIAspectRatioConstraint for 3:4
+-- Detail cards use fixed pixel size
 local SIZE_PRESETS = {
-	hand   = UDim2.new(0, 110, 0, 147),
+	hand   = nil, -- uses scale + aspect ratio constraint, like board
 	detail = UDim2.new(0, 240, 0, 340),
 }
 
@@ -105,8 +107,15 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	frame.Name = "Card_" .. cardID
 	if size then
 		frame.Size = size
+	elseif displaySize == "hand" then
+		-- Hand cards: fill parent width, height set by aspect ratio
+		frame.Size = UDim2.new(1, 0, 0, 10) -- height placeholder, constraint overrides
+		local handAspect = Instance.new("UIAspectRatioConstraint")
+		handAspect.AspectRatio = 3 / 4  -- portrait
+		handAspect.DominantAxis = Enum.DominantAxis.Width
+		handAspect.Parent = frame
 	else
-		-- Board cards: no fixed size, they inherit slot dimensions
+		-- Board cards: fill slot dimensions (slot has its own aspect constraint)
 		frame.Size = UDim2.new(1, 0, 1, 0)
 	end
 	frame.BackgroundColor3 = Color3.fromRGB(40, 42, 55)
