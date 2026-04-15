@@ -622,7 +622,7 @@ function CardDatabase.validate()
 		if not card.cost or card.cost < 0 or card.cost > 10 then
 			table.insert(errors, id .. ": invalid cost " .. tostring(card.cost))
 		end
-		if not card.power and card.power ~= 0 then
+		if card.power == nil then
 			table.insert(errors, id .. ": missing power")
 		end
 		if not card.rarity then table.insert(errors, id .. ": missing rarity") end
