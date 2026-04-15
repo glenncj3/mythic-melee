@@ -337,7 +337,10 @@ function MatchManager:runTurn()
 	-- 10. RECALCULATE ALL ONGOING EFFECTS
 	self:recalculateOngoing()
 
-	-- 11. BROADCAST REVEAL RESULTS
+	-- 11. RESOLVE END-OF-TURN ABILITIES
+	self:resolveEndOfTurn()
+
+	-- 12. BROADCAST REVEAL RESULTS
 	self:sendRevealResult()
 
 	-- 12. SCORE LOCATIONS
@@ -674,7 +677,7 @@ function MatchManager:placeCards(playerID, validPlays)
 		if existingCard then
 			print(string.format("[Match] OVERWRITE: %s destroys their %s at loc %d (%d,%d)",
 				playerID, existingCard.cardID, locIdx, col, row))
-			GSU.setCard(gs, playerID, locIdx, col, row, nil)
+			GSU.destroyCard(gs, playerID, locIdx, col, row)
 		end
 
 		-- Remove card from hand
@@ -793,6 +796,46 @@ function MatchManager:recalculateOngoing()
 	end
 
 	-- Recalculate all power
+	for _, player in pairs(gs.players) do
+		for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
+			for row = 1, GameConfig.GRID_ROWS do
+				for col = 1, GameConfig.GRID_COLUMNS do
+					local card = player.boards[locIdx][row][col]
+					if card then
+						GSU.recalculatePower(card)
+					end
+				end
+			end
+		end
+	end
+end
+
+-- ============================================================
+-- End-of-Turn Resolution
+-- ============================================================
+
+function MatchManager:resolveEndOfTurn()
+	local gs = self.gameState
+
+	print("[Match] --- Resolving End-of-Turn abilities ---")
+
+	for pid, player in pairs(gs.players) do
+		for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
+			for row = 1, GameConfig.GRID_ROWS do
+				for col = 1, GameConfig.GRID_COLUMNS do
+					local card = player.boards[locIdx][row][col]
+					if card then
+						local def = CardDatabase[card.cardID]
+						if def and def.ability and AbilityRegistry.isEndOfTurn(def.ability) then
+							AbilityRegistry.resolveEndOfTurn(gs, card, pid, locIdx, col, row)
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- Recalculate power after EndOfTurn modifications
 	for _, player in pairs(gs.players) do
 		for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
 			for row = 1, GameConfig.GRID_ROWS do

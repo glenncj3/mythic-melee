@@ -163,6 +163,27 @@ function GameStateUtils.pickRandom(list)
 	return list[math.random(#list)]
 end
 
+-- Destroy a card at a specific slot, firing OnDestroy abilities first
+-- Returns true if the card was actually removed (OnDestroy:Bounce:Self can prevent it)
+function GameStateUtils.destroyCard(gameState, playerID, locIdx, col, row)
+	local card = GameStateUtils.getCard(gameState, playerID, locIdx, col, row)
+	if not card then return false end
+
+	-- Fire OnDestroy abilities (requires AbilityRegistry — lazy require to avoid circular)
+	local AbilityRegistry = require(script.Parent.AbilityRegistry)
+	AbilityRegistry.resolveOnDestroy(gameState, card, playerID, locIdx, col, row)
+
+	-- Check if the card bounced to hand (OnDestroy:Bounce:Self sets this flag)
+	if card._bouncedToHand then
+		GameStateUtils.setCard(gameState, playerID, locIdx, col, row, nil)
+		return false  -- card went to hand, not truly destroyed
+	end
+
+	-- Remove the card from the board
+	GameStateUtils.setCard(gameState, playerID, locIdx, col, row, nil)
+	return true
+end
+
 -- Draw N cards from a player's deck into hand
 function GameStateUtils.drawCards(gameState, playerID, count)
 	local player = gameState.players[playerID]

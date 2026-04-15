@@ -222,9 +222,9 @@ onRevealResolvers["DestroyBelow"] = function(gameState, sourceCard, playerID, lo
 					if card then
 						local power = GSU.getCurrentPower(card)
 						if power <= threshold then
-							GSU.setCard(gameState, pid, loc, c, r, nil)
-							print(string.format("  [Ability] %s: destroyed %s (Power %d <= %d) at loc %d (%d,%d)",
+							print(string.format("  [Ability] %s: destroying %s (Power %d <= %d) at loc %d (%d,%d)",
 								sourceCard.cardID, card.cardID, power, threshold, loc, c, r))
+							GSU.destroyCard(gameState, pid, loc, c, r)
 						end
 					end
 				end
@@ -352,6 +352,144 @@ end
 -- Ongoing:Immune (Colossus)
 ongoingResolvers["Immune"] = function(_gameState, sourceCard, _playerID, _locIdx, _col, _row, _params)
 	sourceCard.isImmune = true
+end
+
+-- ============================================================
+-- On Destroy resolvers (fired when a card is removed from the board)
+-- ============================================================
+
+local onDestroyResolvers = {}
+
+-- OnDestroy:DrawCard:N
+onDestroyResolvers["DrawCard"] = function(gameState, sourceCard, playerID, _locIdx, _col, _row, params)
+	local amount = tonumber(params[1]) or 1
+	print(string.format("  [Ability] %s OnDestroy: draw %d card(s)", sourceCard.cardID, amount))
+	GSU.drawCards(gameState, playerID, amount)
+end
+
+-- OnDestroy:AddPower:Target:Amount
+onDestroyResolvers["AddPower"] = function(gameState, sourceCard, playerID, locIdx, col, row, params)
+	local target = params[1]
+	local amount = tonumber(params[2]) or 0
+	local sourceName = sourceCard.cardID .. "_ONDESTROY"
+
+	if target == "AllFriendlyHere" then
+		local friendlies = GSU.getFriendlyCardsAt(gameState, playerID, locIdx, col, row)
+		for _, entry in ipairs(friendlies) do
+			GSU.addModifier(entry.card, sourceName, amount, false)
+			print(string.format("  [Ability] %s OnDestroy: +%d Power to %s",
+				sourceCard.cardID, amount, entry.card.cardID))
+		end
+	end
+end
+
+-- OnDestroy:SummonToken:Power
+onDestroyResolvers["SummonToken"] = function(gameState, sourceCard, playerID, locIdx, col, row, params)
+	local tokenPower = tonumber(params[1]) or 1
+	-- Try to place token at the same slot (just vacated), or random empty
+	local emptySlots = GSU.getEmptySlots(gameState, playerID, locIdx)
+	-- The card's slot may already be nil (since destroy nils first), so include it
+	local slot = nil
+	for _, s in ipairs(emptySlots) do
+		if s.col == col and s.row == row then
+			slot = s
+			break
+		end
+	end
+	if not slot then
+		slot = GSU.pickRandom(emptySlots)
+	end
+	if slot then
+		local token = {
+			cardID = sourceCard.cardID .. "_TOKEN",
+			basePower = tokenPower,
+			powerModifiers = {},
+			currentPower = tokenPower,
+			isToken = true,
+			isImmune = false,
+			turnPlayed = gameState.turn,
+			playOrder = 999,
+		}
+		GSU.setCard(gameState, playerID, locIdx, slot.col, slot.row, token)
+		print(string.format("  [Ability] %s OnDestroy: summoned %d-Power token at (%d,%d)",
+			sourceCard.cardID, tokenPower, slot.col, slot.row))
+	end
+end
+
+-- OnDestroy:Bounce:Self — return to hand instead of being destroyed
+onDestroyResolvers["Bounce"] = function(gameState, sourceCard, playerID, _locIdx, _col, _row, params)
+	local target = params[1] or "Self"
+	if target == "Self" then
+		local player = gameState.players[playerID]
+		if #player.hand < GameConfig.MAX_HAND_SIZE then
+			table.insert(player.hand, sourceCard.cardID)
+			sourceCard._bouncedToHand = true
+			print(string.format("  [Ability] %s OnDestroy: bounced back to hand", sourceCard.cardID))
+		else
+			print(string.format("  [Ability] %s OnDestroy: hand full, cannot bounce", sourceCard.cardID))
+		end
+	end
+end
+
+-- ============================================================
+-- End of Turn resolvers (fired after Ongoing recalc each turn)
+-- ============================================================
+
+local endOfTurnResolvers = {}
+
+-- EndOfTurn:AddPower:Target:Amount
+endOfTurnResolvers["AddPower"] = function(gameState, sourceCard, playerID, locIdx, col, row, params)
+	local target = params[1]
+	local amount = tonumber(params[2]) or 0
+	local sourceName = sourceCard.cardID .. "_ENDOFTURN"
+
+	if target == "Self" then
+		GSU.addModifier(sourceCard, sourceName, amount, false)
+		print(string.format("  [Ability] %s EndOfTurn: +%d Power to self", sourceCard.cardID, amount))
+
+	elseif target == "AllFriendlyHere" then
+		local friendlies = GSU.getFriendlyCardsAt(gameState, playerID, locIdx, col, row)
+		for _, entry in ipairs(friendlies) do
+			GSU.addModifier(entry.card, sourceName, amount, false)
+		end
+		GSU.addModifier(sourceCard, sourceName, amount, false)
+		print(string.format("  [Ability] %s EndOfTurn: +%d Power to all friendlies here",
+			sourceCard.cardID, amount))
+	end
+end
+
+-- EndOfTurn:DamageAll:Amount — -N to all enemy cards at this location
+endOfTurnResolvers["DamageAll"] = function(gameState, sourceCard, playerID, locIdx, _col, _row, params)
+	local amount = tonumber(params[1]) or 1
+	local sourceName = sourceCard.cardID .. "_ENDOFTURN"
+	local enemies = GSU.getEnemyCardsAt(gameState, playerID, locIdx)
+	for _, entry in ipairs(enemies) do
+		GSU.addModifier(entry.card, sourceName, -amount, true)
+	end
+	print(string.format("  [Ability] %s EndOfTurn: -%d Power to %d enemies here",
+		sourceCard.cardID, amount, #enemies))
+end
+
+-- EndOfTurn:SummonToken:Power — summon a token in a random empty slot here
+endOfTurnResolvers["SummonToken"] = function(gameState, sourceCard, playerID, locIdx, _col, _row, params)
+	local tokenPower = tonumber(params[1]) or 1
+	local emptySlots = GSU.getEmptySlots(gameState, playerID, locIdx)
+	local slot = GSU.pickRandom(emptySlots)
+	if slot then
+		local token = {
+			cardID = sourceCard.cardID .. "_TOKEN",
+			basePower = tokenPower,
+			powerModifiers = {},
+			currentPower = tokenPower,
+			isToken = true,
+			isImmune = false,
+			turnPlayed = gameState.turn,
+			playOrder = 999,
+		}
+		GSU.setCard(gameState, playerID, locIdx, slot.col, slot.row, token)
+		print(string.format("  [Ability] %s EndOfTurn: summoned %d-Power token at (%d,%d)",
+			sourceCard.cardID, tokenPower, slot.col, slot.row))
+	end
 end
 
 -- ============================================================
@@ -485,6 +623,62 @@ function AbilityRegistry.isOnReveal(abilityString)
 		if parsed.trigger == "OnReveal" then return true end
 	end
 	return false
+end
+
+-- Check if any sub-ability is an OnDestroy type
+function AbilityRegistry.isOnDestroy(abilityString)
+	if not abilityString then return false end
+	for _, parsed in ipairs(AbilityRegistry.parseAll(abilityString)) do
+		if parsed.trigger == "OnDestroy" then return true end
+	end
+	return false
+end
+
+-- Check if any sub-ability is an EndOfTurn type
+function AbilityRegistry.isEndOfTurn(abilityString)
+	if not abilityString then return false end
+	for _, parsed in ipairs(AbilityRegistry.parseAll(abilityString)) do
+		if parsed.trigger == "EndOfTurn" then return true end
+	end
+	return false
+end
+
+-- Resolve all OnDestroy sub-abilities for a card being destroyed
+function AbilityRegistry.resolveOnDestroy(gameState, sourceCard, playerID, locIdx, col, row)
+	local CardDatabase = require(script.Parent.CardDatabase)
+	local def = CardDatabase[sourceCard.cardID]
+	if not def or not def.ability then return end
+
+	local allParsed = AbilityRegistry.parseAll(def.ability)
+	for _, parsed in ipairs(allParsed) do
+		if parsed.trigger == "OnDestroy" then
+			local resolver = onDestroyResolvers[parsed.effect]
+			if resolver then
+				resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+			else
+				print(string.format("  [Ability] WARNING: no resolver for OnDestroy effect '%s'", parsed.effect))
+			end
+		end
+	end
+end
+
+-- Resolve all EndOfTurn sub-abilities for a card on the board
+function AbilityRegistry.resolveEndOfTurn(gameState, sourceCard, playerID, locIdx, col, row)
+	local CardDatabase = require(script.Parent.CardDatabase)
+	local def = CardDatabase[sourceCard.cardID]
+	if not def or not def.ability then return end
+
+	local allParsed = AbilityRegistry.parseAll(def.ability)
+	for _, parsed in ipairs(allParsed) do
+		if parsed.trigger == "EndOfTurn" then
+			local resolver = endOfTurnResolvers[parsed.effect]
+			if resolver then
+				resolver(gameState, sourceCard, playerID, locIdx, col, row, parsed.params)
+			else
+				print(string.format("  [Ability] WARNING: no resolver for EndOfTurn effect '%s'", parsed.effect))
+			end
+		end
+	end
 end
 
 -- ============================================================
