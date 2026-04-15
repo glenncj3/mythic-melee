@@ -67,6 +67,8 @@ local detailOverlay = nil
 local gameOverOverlay = nil
 local locationFrames = {}
 local handCardFrames = {}
+local lastMyBoards = nil
+local lastOppBoards = nil
 
 -- ============================================================
 -- Color Constants
@@ -319,7 +321,9 @@ local function createMatchUI()
 	confirmCorner.CornerRadius = UDim.new(0, 8)
 	confirmCorner.Parent = confirmButton
 
-	confirmButton.MouseButton1Click:Connect(onConfirmClicked)
+	confirmButton.MouseButton1Click:Connect(function()
+		onConfirmClicked()
+	end)
 
 	waitingLabel = Instance.new("TextLabel")
 	waitingLabel.Name = "WaitingLabel"
@@ -1003,6 +1007,32 @@ local function updatePowerTotals(myBoards, oppBoards)
 end
 
 -- ============================================================
+-- Submission
+-- ============================================================
+
+local function submitPlays()
+	if submitted then return end
+	submitted = true
+
+	local plays = {}
+	for _, play in ipairs(pendingPlays) do
+		table.insert(plays, {
+			cardID = play.cardID,
+			locIdx = play.locIdx,
+			col = play.col,
+			row = play.row,
+		})
+	end
+
+	print(string.format("[Client] Submitting %d plays", #plays))
+	SubmitTurnEvent:FireServer(plays)
+
+	timerRunning = false
+	if confirmButton then confirmButton.Visible = false end
+	if waitingLabel then waitingLabel.Visible = true end
+end
+
+-- ============================================================
 -- Interaction Handlers
 -- ============================================================
 
@@ -1103,28 +1133,6 @@ function onConfirmClicked()
 	submitPlays()
 end
 
-local function submitPlays()
-	if submitted then return end
-	submitted = true
-
-	local plays = {}
-	for _, play in ipairs(pendingPlays) do
-		table.insert(plays, {
-			cardID = play.cardID,
-			locIdx = play.locIdx,
-			col = play.col,
-			row = play.row,
-		})
-	end
-
-	print(string.format("[Client] Submitting %d plays", #plays))
-	SubmitTurnEvent:FireServer(plays)
-
-	timerRunning = false
-	if confirmButton then confirmButton.Visible = false end
-	if waitingLabel then waitingLabel.Visible = true end
-end
-
 function returnToLobby()
 	matchActive = false
 	submitted = false
@@ -1192,9 +1200,6 @@ end
 -- ============================================================
 -- Server Event Handlers
 -- ============================================================
-
-local lastMyBoards = nil
-local lastOppBoards = nil
 
 TurnStartEvent.OnClientEvent:Connect(function(state)
 	if not matchActive then
