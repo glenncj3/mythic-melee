@@ -634,32 +634,24 @@ local function createMatchUI()
 	timerLabel.ZIndex = 4
 	timerLabel.Parent = topRow
 
-	-- Hand area (vertical scroll of portrait cards)
-	handFrame = Instance.new("ScrollingFrame")
+	-- Hand area (2 columns x 3 rows grid, max 6 cards)
+	handFrame = Instance.new("Frame")
 	handFrame.Name = "HandArea"
-	handFrame.Size = UDim2.new(1, -16, 1, -120)
-	handFrame.Position = UDim2.new(0, 8, 0, 58)
+	handFrame.Size = UDim2.new(1, -12, 1, -112)
+	handFrame.Position = UDim2.new(0, 6, 0, 58)
 	handFrame.BackgroundTransparency = 1
 	handFrame.BorderSizePixel = 0
-	handFrame.ScrollBarThickness = 4
-	handFrame.ScrollBarImageColor3 = COLORS.textGray
-	handFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-	handFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	handFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	handFrame.ZIndex = 3
 	handFrame.Parent = sidebar
 
-	local handLayout = Instance.new("UIListLayout")
-	handLayout.FillDirection = Enum.FillDirection.Vertical
-	handLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	handLayout.Padding = UDim.new(0, 6)
-	handLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	handLayout.Parent = handFrame
-
-	local handPadding = Instance.new("UIPadding")
-	handPadding.PaddingTop = UDim.new(0, 4)
-	handPadding.PaddingBottom = UDim.new(0, 4)
-	handPadding.Parent = handFrame
+	local handGrid = Instance.new("UIGridLayout")
+	handGrid.CellSize = UDim2.new(0.48, 0, 0.32, 0)
+	handGrid.CellPadding = UDim2.new(0.02, 0, 0.01, 0)
+	handGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	handGrid.VerticalAlignment = Enum.VerticalAlignment.Top
+	handGrid.SortOrder = Enum.SortOrder.LayoutOrder
+	handGrid.FillDirection = Enum.FillDirection.Horizontal
+	handGrid.Parent = handFrame
 
 	-- Confirm button (bottom of sidebar)
 	confirmButton = Instance.new("TextButton")
@@ -1466,14 +1458,22 @@ local function renderHand()
 		local available = myEnergy - energySpent
 		local canAfford = def.cost <= available
 
-		local cardF = CardFrame.create(cardID, "hand")
+		-- Create card at "board" size so it fills the grid cell
+		local cardF = CardFrame.create(cardID, "board")
 		if cardF then
 			cardF.LayoutOrder = i
+			-- Card fills the grid cell (UIGridLayout sets cell size)
+			cardF.Size = UDim2.new(1, 0, 1, 0)
 
-			-- Unaffordable cards: dim (Phase 1E)
+			-- Force portrait aspect ratio within grid cell
+			local cellAspect = Instance.new("UIAspectRatioConstraint")
+			cellAspect.AspectRatio = 3 / 4
+			cellAspect.DominantAxis = Enum.DominantAxis.Height
+			cellAspect.Parent = cardF
+
+			-- Unaffordable cards: dim
 			if not canAfford then
 				cardF.BackgroundTransparency = 0.4
-				cardF.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 			end
 
 			cardF.Parent = handFrame
@@ -1492,16 +1492,13 @@ local function renderHand()
 				onHandCardClicked(cID, cardIndex)
 			end)
 
-			-- Highlight if selected (Phase 3A)
+			-- Highlight if selected — bright green border (grid controls position, no offset)
 			if selectedCardID == cardID and selectedCardIndex == i then
-				-- Green glow stroke
-				local selStroke = cardF:FindFirstChildWhichIsA("UIStroke")
+				local selStroke = cardF:FindFirstChild("RarityStroke")
 				if selStroke then
 					selStroke.Color = COLORS.slotHighlight
-					selStroke.Thickness = 3
+					selStroke.Thickness = 4
 				end
-				-- Lift effect (tween up)
-				cardF.Position = UDim2.new(0, 0, 0, -10)
 			end
 
 			table.insert(handCardFrames, cardF)

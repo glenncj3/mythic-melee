@@ -106,8 +106,6 @@ test("CardFrame hand size has correct portrait dimensions", function()
 	assertNotNil(frame)
 	assertEqual(frame.Size.X.Offset, 130, "hand width")
 	assertEqual(frame.Size.Y.Offset, 173, "hand height")
-	-- Verify portrait ratio (width < height)
-	assertTrue(frame.Size.X.Offset < frame.Size.Y.Offset, "hand card should be portrait")
 	frame:Destroy()
 end)
 

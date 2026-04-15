@@ -115,8 +115,8 @@ test("GameConfig.CARDS_DRAWN_PER_TURN is 1", function()
 	assertEqual(GameConfig.CARDS_DRAWN_PER_TURN, 1, "CARDS_DRAWN_PER_TURN")
 end)
 
-test("GameConfig.MAX_HAND_SIZE is 7", function()
-	assertEqual(GameConfig.MAX_HAND_SIZE, 7, "MAX_HAND_SIZE")
+test("GameConfig.MAX_HAND_SIZE is 6", function()
+	assertEqual(GameConfig.MAX_HAND_SIZE, 6, "MAX_HAND_SIZE")
 end)
 
 test("GameConfig.TURN_TIMER_SECONDS is 30", function()
