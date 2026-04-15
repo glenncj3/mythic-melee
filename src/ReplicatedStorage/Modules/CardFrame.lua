@@ -48,10 +48,10 @@ local ABILITY_PIP_COLORS = {
 }
 
 -- Size presets { width, height }
--- Board and hand cards use scale sizing (fill parent) with UIAspectRatioConstraint for 3:4
--- Detail cards use fixed pixel size
+-- Board cards use scale sizing (fill slot) — the slot has its own aspect ratio constraint
+-- Hand and detail cards use fixed pixel size at 3:4 portrait ratio
 local SIZE_PRESETS = {
-	hand   = nil, -- uses scale + aspect ratio constraint, like board
+	hand   = UDim2.new(0, 130, 0, 173),
 	detail = UDim2.new(0, 240, 0, 340),
 }
 
@@ -107,18 +107,11 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	frame.Name = "Card_" .. cardID
 	if size then
 		frame.Size = size
-	elseif displaySize == "hand" then
-		-- Hand cards: fill parent width, height set by aspect ratio
-		frame.Size = UDim2.new(1, 0, 0, 10) -- height placeholder, constraint overrides
-		local handAspect = Instance.new("UIAspectRatioConstraint")
-		handAspect.AspectRatio = 3 / 4  -- portrait
-		handAspect.DominantAxis = Enum.DominantAxis.Width
-		handAspect.Parent = frame
 	else
 		-- Board cards: fill slot dimensions (slot has its own aspect constraint)
 		frame.Size = UDim2.new(1, 0, 1, 0)
 	end
-	frame.BackgroundColor3 = Color3.fromRGB(40, 42, 55)
+	frame.BackgroundColor3 = Color3.fromRGB(55, 58, 72)
 	frame.BorderSizePixel = 0
 
 	-- Rarity border (UIStroke)
@@ -136,7 +129,8 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	-- Art area with gradient
 	local artFrame = Instance.new("Frame")
 	artFrame.Name = "Art"
-	artFrame.BackgroundColor3 = artColor
+	-- Use white background so UIGradient colors render accurately (gradient multiplies with bg)
+	artFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	artFrame.BorderSizePixel = 0
 	artFrame.Parent = frame
 
@@ -144,7 +138,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	artCorner.CornerRadius = UDim.new(0, 4)
 	artCorner.Parent = artFrame
 
-	-- Art gradient for dimensionality
+	-- Art gradient for dimensionality (colors render as-is against white background)
 	local artGradient = Instance.new("UIGradient")
 	artGradient.Color = ColorSequence.new(artColor, darkenColor(artColor, 0.25))
 	artGradient.Rotation = 135
