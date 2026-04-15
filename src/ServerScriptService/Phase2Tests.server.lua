@@ -254,17 +254,17 @@ test("Dueling Grounds allows front row", function()
 	assertEqual(#valid, 1, "Dueling Grounds should allow front row")
 end)
 
-test("Cannot overwrite opponent card", function()
+test("Playing at same slot coords as opponent is allowed (separate grids)", function()
 	local match = makeTestMatch()
 	match.gameState = makeGameState()
-	-- Place opponent card at loc 1 (1,1)
+	-- Opponent has a card at loc 1 (1,1) on THEIR grid
 	match.gameState.players["P2"].boards[1][1][1] = makeCardState("SPARK", 1, 1)
 
 	local plays = {
-		{ cardID = "SPARK", locIdx = 1, col = 1, row = 1 },  -- slot has enemy card
+		{ cardID = "SPARK", locIdx = 1, col = 1, row = 1 },  -- same coords, but on P1's own grid
 	}
 	local valid = match:validateSubmission("P1", plays)
-	assertEqual(#valid, 0, "Should reject play on opponent's slot")
+	assertEqual(#valid, 1, "Should allow play — each player has their own grid")
 end)
 
 test("Overwriting own card is allowed", function()

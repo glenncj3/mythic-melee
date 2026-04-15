@@ -700,14 +700,9 @@ function MatchManager:validateSubmission(playerID, submission)
 			continue
 		end
 
-		-- Check if opponent card is in that slot (can't overwrite opponent)
-		local opponentID = getOpponentID(gs, playerID)
-		local oppCard = getCard(gs, opponentID, locIdx, col, row)
-		if oppCard then
-			print(string.format("[Match] REJECTED: %s play %d — slot occupied by opponent", playerID, i))
-			self:sendInvalidPlay(playerID, "Cannot overwrite opponent's card")
-			continue
-		end
+		-- Each player has their own separate 3x2 grid at each location.
+		-- No need to check opponent's board — players can never play on each other's grids.
+		-- Overwriting own cards (own slot already occupied) is handled in placeCards.
 
 		-- Check location restrictions
 		local location = gs.locations[locIdx]
