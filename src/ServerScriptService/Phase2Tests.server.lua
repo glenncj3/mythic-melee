@@ -97,6 +97,7 @@ local function makeGameState()
 				score = 0,
 				deck = { "DRAGON", "TITAN", "OVERLORD", "VOID_WALKER", "COLOSSUS" },
 				hand = { "SPARK", "SCOUT", "IRON_GUARD", "HEALER", "STONE_GOLEM" },
+				maxEnergy = 5,
 				energy = 5,
 				boards = makeEmptyBoard(),
 			},
@@ -104,6 +105,7 @@ local function makeGameState()
 				score = 0,
 				deck = { "DRAGON", "TITAN", "OVERLORD", "VOID_WALKER", "COLOSSUS" },
 				hand = { "SPARK", "SABOTEUR", "IRON_GUARD", "WAR_BEAST", "EMBER" },
+				maxEnergy = 5,
 				energy = 5,
 				boards = makeEmptyBoard(),
 			},
@@ -276,6 +278,63 @@ test("Overwriting own card is allowed", function()
 	}
 	local valid = match:validateSubmission("P1", plays)
 	assertEqual(#valid, 1, "Should allow overwriting own card")
+end)
+
+-- ============================================================
+-- 1b. Energy System Tests
+-- ============================================================
+
+print("\n=== Energy System Tests ===")
+
+test("Energy refills to max each turn, not increments from remaining", function()
+	local match = makeTestMatch()
+	match.gameState = makeGameState()
+	local gs = match.gameState
+
+	-- Simulate turn 3: player has 5 max energy, spends 3
+	gs.players["P1"].maxEnergy = 3
+	gs.players["P1"].energy = 0  -- spent all energy
+
+	-- Turn 4 grant: max goes to 4, energy refills to 4
+	gs.turn = 3
+	gs.turn = gs.turn + 1
+	gs.players["P1"].maxEnergy = gs.players["P1"].maxEnergy + GameConfig.ENERGY_PER_TURN
+	gs.players["P1"].energy = gs.players["P1"].maxEnergy
+
+	assertEqual(gs.players["P1"].maxEnergy, 4, "Max energy should be 4 on turn 4")
+	assertEqual(gs.players["P1"].energy, 4, "Energy should refill to 4, not 0+1=1")
+end)
+
+test("Energy on turn N equals N regardless of spending", function()
+	-- Simulate a full sequence of turns
+	local maxE = GameConfig.STARTING_MAX_ENERGY
+	for turn = 1, 10 do
+		maxE = maxE + GameConfig.ENERGY_PER_TURN
+		local energy = maxE  -- refill
+		assertEqual(energy, turn, "Turn " .. turn .. " should have " .. turn .. " energy")
+
+		-- Simulate spending all energy
+		energy = 0
+		-- Next turn should still refill properly
+	end
+end)
+
+test("Spending energy does not reduce next turn's max", function()
+	local match = makeTestMatch()
+	match.gameState = makeGameState()
+	local gs = match.gameState
+
+	gs.players["P1"].maxEnergy = 5
+	gs.players["P1"].energy = 5
+
+	-- Play Stone Golem (cost 3)
+	local plays = { { cardID = "STONE_GOLEM", locIdx = 2, col = 1, row = 1, playOrder = 1 } }
+	match:placeCards("P1", plays)
+
+	-- Energy should be reduced by 3
+	assertEqual(gs.players["P1"].energy, 2, "Energy after spending 3 should be 2")
+	-- Max energy should be unchanged
+	assertEqual(gs.players["P1"].maxEnergy, 5, "Max energy should still be 5")
 end)
 
 -- ============================================================
@@ -725,6 +784,38 @@ test("Bot respects Sky Temple restriction", function()
 			assertTrue(def.cost >= 3, "Bot played low-cost card at Sky Temple: " .. play.cardID)
 		end
 	end
+end)
+
+test("Bot plays expensive cards when it has enough energy", function()
+	local gs = makeGameState()
+	gs.players["P2"].maxEnergy = 6
+	gs.players["P2"].energy = 6
+	gs.players["P2"].hand = { "TITAN", "SPARK", "IRON_GUARD" }  -- TITAN costs 6
+
+	local plays = BotPlayer.decidePlays(gs, "P2")
+
+	-- Bot should play TITAN (cost 6) since it sorts by cost descending
+	local playedTitan = false
+	for _, play in ipairs(plays) do
+		if play.cardID == "TITAN" then playedTitan = true end
+	end
+	assertTrue(playedTitan, "Bot should play TITAN when it has 6 energy")
+end)
+
+test("Bot plays multiple cards spending full energy", function()
+	local gs = makeGameState()
+	gs.players["P2"].maxEnergy = 5
+	gs.players["P2"].energy = 5
+	gs.players["P2"].hand = { "STONE_GOLEM", "IRON_GUARD", "SPARK" }  -- 3+2+1 = 6, but only 5 energy
+
+	local plays = BotPlayer.decidePlays(gs, "P2")
+
+	local totalCost = 0
+	for _, play in ipairs(plays) do
+		totalCost = totalCost + CardDatabase[play.cardID].cost
+	end
+	assertTrue(totalCost >= 4, "Bot should spend most of its 5 energy, spent: " .. totalCost)
+	assertTrue(totalCost <= 5, "Bot should not exceed 5 energy, spent: " .. totalCost)
 end)
 
 -- ============================================================

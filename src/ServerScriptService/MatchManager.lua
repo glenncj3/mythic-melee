@@ -179,6 +179,7 @@ function MatchManager:initGameState()
 				score = 0,
 				deck = deck1,
 				hand = hand1,
+				maxEnergy = GameConfig.STARTING_MAX_ENERGY,
 				energy = GameConfig.STARTING_MAX_ENERGY,
 				boards = makeEmptyBoard(),
 			},
@@ -186,6 +187,7 @@ function MatchManager:initGameState()
 				score = 0,
 				deck = deck2,
 				hand = hand2,
+				maxEnergy = GameConfig.STARTING_MAX_ENERGY,
 				energy = GameConfig.STARTING_MAX_ENERGY,
 				boards = makeEmptyBoard(),
 			},
@@ -316,10 +318,11 @@ function MatchManager:runTurn()
 	gs.turn = gs.turn + 1
 	print(string.format("\n[Match] ========== TURN %d ==========", gs.turn))
 
-	-- 2. GRANT ENERGY
+	-- 2. GRANT ENERGY (max increases by 1 each turn, then refill to max)
 	for _, pid in ipairs({p1ID, p2ID}) do
-		gs.players[pid].energy = gs.players[pid].energy + GameConfig.ENERGY_PER_TURN
-		print(string.format("[Match] %s energy: %d", pid, gs.players[pid].energy))
+		gs.players[pid].maxEnergy = gs.players[pid].maxEnergy + GameConfig.ENERGY_PER_TURN
+		gs.players[pid].energy = gs.players[pid].maxEnergy
+		print(string.format("[Match] %s energy: %d / %d", pid, gs.players[pid].energy, gs.players[pid].maxEnergy))
 	end
 
 	-- 3. DRAW CARDS
@@ -1075,9 +1078,10 @@ function MatchManager.runTestMatch()
 		gs.turn = gs.turn + 1
 		print(string.format("\n[TestMatch] ========== TURN %d ==========", gs.turn))
 
-		-- GRANT ENERGY
+		-- GRANT ENERGY (max increases, then refill to max)
 		for _, pid in ipairs({p1ID, p2ID}) do
-			gs.players[pid].energy = gs.players[pid].energy + GameConfig.ENERGY_PER_TURN
+			gs.players[pid].maxEnergy = gs.players[pid].maxEnergy + GameConfig.ENERGY_PER_TURN
+			gs.players[pid].energy = gs.players[pid].maxEnergy
 		end
 
 		-- DRAW CARDS
