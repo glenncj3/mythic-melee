@@ -3,12 +3,14 @@
 
 	Responsibilities:
 		- Builds match GUI (two locations, 1x3 grids, hand, scores, energy, timer)
-		- Planning phase: tap-to-select card, tap-to-place, pending management
+		- Planning phase: drag-to-play cards, click-to-inspect
 		- Sends SubmitTurn to server on confirm or timer expiry
 		- Receives RevealResult, ScoreUpdate, GameOver from server
 		- Animates reveals, score changes, game-over screen
 		- Pre-match: shows "Play vs Bot" button with lobby animations
 ]]
+
+print("[MatchClient] v2 loaded — drag-and-drop + click-to-inspect")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +54,13 @@ local locations = {}
 local selectedCardID = nil
 local selectedCardIndex = nil
 local pendingPlays = {}
+-- Drag-and-drop state
+local draggingCardID = nil
+local draggingCardIndex = nil
+local dragGhost = nil
+local dragConnections = {}
+local isDragging = false
+local lastHoveredSlot = nil
 local timerRunning = false
 local timerSeconds = 0
 local submitted = false
@@ -1284,8 +1293,9 @@ local function updateEnergyDisplay()
 
 	-- Energy cost preview (Phase 5C)
 	if energyPreviewLabel then
-		if selectedCardID then
-			local def = CardDatabase[selectedCardID]
+		local previewCardID = selectedCardID or draggingCardID
+		if previewCardID then
+			local def = CardDatabase[previewCardID]
 			if def then
 				energyPreviewLabel.Text = "(-" .. def.cost .. ")"
 				energyPreviewLabel.Visible = true
@@ -1476,6 +1486,11 @@ local function renderHand()
 				cardF.BackgroundTransparency = 0.4
 			end
 
+			-- Dim if being dragged
+			if draggingCardID == cardID and draggingCardIndex == i then
+				cardF.BackgroundTransparency = 0.6
+			end
+
 			cardF.Parent = handFrame
 
 			-- Click area (transparent button on top of card)
@@ -1489,18 +1504,13 @@ local function renderHand()
 
 			local cardIndex = i
 			local cID = cardID
-			clickArea.MouseButton1Click:Connect(function()
-				onHandCardClicked(cID, cardIndex)
-			end)
-
-			-- Highlight if selected — bright green border
-			if selectedCardID == cardID and selectedCardIndex == i then
-				local selStroke = cardF:FindFirstChild("RarityStroke")
-				if selStroke then
-					selStroke.Color = COLORS.slotHighlight
-					selStroke.Thickness = 4
+			local thisCardFrame = cardF
+			clickArea.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+					startDrag(cID, cardIndex, thisCardFrame, input)
 				end
-			end
+			end)
 
 			table.insert(handCardFrames, cardF)
 		end
@@ -1547,9 +1557,10 @@ local function highlightValidSlots()
 		end
 	end
 
-	if not selectedCardID then return end
+	local highlightCardID = selectedCardID or draggingCardID
+	if not highlightCardID then return end
 
-	local def = CardDatabase[selectedCardID]
+	local def = CardDatabase[highlightCardID]
 	if not def then return end
 
 	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
@@ -1588,7 +1599,7 @@ local function highlightValidSlots()
 
 					-- Pulsing border animation (Phase 3C)
 					pulseProperty(stroke, "Transparency", 0, 0.6, 0.5, function()
-						return selectedCardID ~= nil
+						return selectedCardID ~= nil or draggingCardID ~= nil
 					end)
 				end
 			end
@@ -1702,106 +1713,314 @@ local function submitPlays()
 end
 
 -- ============================================================
--- Interaction Handlers
+-- Card Inspect & Drag-and-Drop
 -- ============================================================
 
-function onHandCardClicked(cardID, cardIndex)
-	if not matchActive or submitted then return end
+function showCardInspect(cardID, overridePower, pendingPlay)
+	print("[MatchClient] showCardInspect:", cardID, "pending:", pendingPlay ~= nil)
+	if not detailOverlay then return end
+	local container = detailOverlay:FindFirstChild("CardContainer")
+	if not container then return end
 
-	local def = CardDatabase[cardID]
-	if not def then return end
-
-	local available = myEnergy - energySpent
-	if def.cost > available then
-		showToast("Not enough energy")
-		-- Flash the energy indicator red briefly
-		if energyFrame then
-			local ring = energyFrame:FindFirstChild("EnergyRing")
-			if ring then
-				local origColor = ring.Color
-				ring.Color = COLORS.textRed
-				task.delay(0.3, function()
-					if ring and ring.Parent then ring.Color = origColor end
-				end)
-			end
-		end
-		return
+	-- Clear existing content
+	for _, child in ipairs(container:GetChildren()) do
+		if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
 	end
 
-	if selectedCardID == cardID and selectedCardIndex == cardIndex then
-		selectedCardID = nil
-		selectedCardIndex = nil
-	else
-		selectedCardID = cardID
-		selectedCardIndex = cardIndex
+	local detailCard = CardFrame.create(cardID, "detail", overridePower)
+	if detailCard then
+		detailCard.ZIndex = 12
+		detailCard.Parent = container
 	end
 
-	renderHand()
-	highlightValidSlots()
-	updateEnergyDisplay()
-end
+	-- Show undo button for pending plays
+	if pendingPlay then
+		local undoBtn = Instance.new("TextButton")
+		undoBtn.Name = "UndoButton"
+		undoBtn.Size = UDim2.new(0, 140, 0, 36)
+		undoBtn.Position = UDim2.new(0.5, 0, 1, 10)
+		undoBtn.AnchorPoint = Vector2.new(0.5, 0)
+		undoBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		undoBtn.BorderSizePixel = 0
+		undoBtn.Text = "Undo Play"
+		undoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		undoBtn.TextSize = 16
+		undoBtn.Font = Enum.Font.GothamBold
+		undoBtn.ZIndex = 12
+		undoBtn.Parent = container
 
-function onSlotClicked(locIdx, col, row)
-	if not matchActive or submitted then return end
+		local undoCorner = Instance.new("UICorner")
+		undoCorner.CornerRadius = UDim.new(0, 6)
+		undoCorner.Parent = undoBtn
 
-	-- Check if there's a pending play here — undo it
-	for i, play in ipairs(pendingPlays) do
-		if play.locIdx == locIdx and play.col == col and play.row == row then
-			local def = CardDatabase[play.cardID]
-			if def then
-				energySpent = energySpent - def.cost
+		undoBtn.MouseButton1Click:Connect(function()
+			for i, play in ipairs(pendingPlays) do
+				if play == pendingPlay then
+					local pDef = CardDatabase[play.cardID]
+					if pDef then energySpent = energySpent - pDef.cost end
+					table.remove(pendingPlays, i)
+					break
+				end
 			end
-			table.remove(pendingPlays, i)
-			print("[Client] Undid pending play: " .. play.cardID)
-
-			selectedCardID = nil
-			selectedCardIndex = nil
-
+			detailOverlay.Visible = false
 			renderMyBoard(lastMyBoards)
 			renderPendingPlays()
 			renderHand()
 			highlightValidSlots()
 			updateEnergyDisplay()
+			updatePowerTotals(lastMyBoards, lastOppBoards)
+		end)
+	end
+
+	detailOverlay.Visible = true
+end
+
+function cleanupDrag()
+	for _, conn in ipairs(dragConnections) do
+		conn:Disconnect()
+	end
+	dragConnections = {}
+
+	if dragGhost then
+		dragGhost:Destroy()
+		dragGhost = nil
+	end
+
+	-- Reset hovered slot highlight
+	if lastHoveredSlot then
+		local stroke = lastHoveredSlot:FindFirstChild("SlotStroke")
+		if stroke then
+			stroke.Color = COLORS.slotBorder
+			stroke.Thickness = 1
+		end
+		lastHoveredSlot = nil
+	end
+
+	draggingCardID = nil
+	draggingCardIndex = nil
+	isDragging = false
+end
+
+function findSlotUnderPosition(absX, absY)
+	for locIdx = 1, GameConfig.LOCATIONS_PER_GAME do
+		local lf = locationFrames[locIdx]
+		if not lf then continue end
+
+		for col = 1, GameConfig.GRID_COLUMNS do
+			local slotName = string.format("Slot_%d_%d", col, 1)
+			local slotFrame = lf.myGrid:FindFirstChild(slotName)
+			if not slotFrame then continue end
+
+			local slotPos = slotFrame.AbsolutePosition
+			local slotSize = slotFrame.AbsoluteSize
+
+			-- Match based on horizontal column alignment
+			if absX >= slotPos.X and absX <= slotPos.X + slotSize.X then
+				return locIdx, col, 1, slotFrame
+			end
+		end
+	end
+	return nil, nil, nil, nil
+end
+
+function startDrag(cardID, cardIndex, cardFrame, input)
+	print("[MatchClient] startDrag called:", cardID, "input:", input.UserInputType.Name)
+	if draggingCardID then return end
+	if not matchActive or submitted then return end
+
+	local def = CardDatabase[cardID]
+	if not def then return end
+
+	draggingCardID = cardID
+	draggingCardIndex = cardIndex
+	isDragging = false
+	local startPos = Vector2.new(input.Position.X, input.Position.Y)
+	local canAfford = def.cost <= (myEnergy - energySpent)
+
+	local moveConn = UserInputService.InputChanged:Connect(function(changedInput)
+		if changedInput.UserInputType ~= Enum.UserInputType.MouseMovement
+			and changedInput.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		local mousePos = Vector2.new(changedInput.Position.X, changedInput.Position.Y)
+
+		if not isDragging then
+			local delta = (mousePos - startPos).Magnitude
+			if delta < 5 then return end
+
+			-- Threshold exceeded — try to start drag
+			if not canAfford then
+				showToast("Not enough energy")
+				if energyFrame then
+					local ring = energyFrame:FindFirstChild("EnergyRing")
+					if ring then
+						local origColor = ring.Color
+						ring.Color = COLORS.textRed
+						task.delay(0.3, function()
+							if ring and ring.Parent then ring.Color = origColor end
+						end)
+					end
+				end
+				cleanupDrag()
+				return
+			end
+
+			isDragging = true
+
+			-- Create drag ghost
+			dragGhost = CardFrame.create(cardID, "hand")
+			if dragGhost then
+				local cardSize = cardFrame.AbsoluteSize
+				dragGhost.Size = UDim2.new(0, cardSize.X, 0, cardSize.Y)
+				dragGhost.AnchorPoint = Vector2.new(0.5, 0.5)
+				dragGhost.BackgroundTransparency = 0.3
+				dragGhost.ZIndex = 15
+				for _, desc in ipairs(dragGhost:GetDescendants()) do
+					if desc:IsA("GuiObject") then
+						desc.ZIndex = desc.ZIndex + 12
+					end
+				end
+				dragGhost.Parent = matchGui
+			end
+
+			-- Dim original card in hand
+			cardFrame.BackgroundTransparency = 0.6
+
+			-- Highlight valid drop slots
+			highlightValidSlots()
+			updateEnergyDisplay()
+		end
+
+		-- Update ghost position
+		if dragGhost then
+			dragGhost.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
+
+			-- Update hover highlight on closest slot
+			local hLocIdx, hCol, hRow, hSlotFrame = findSlotUnderPosition(mousePos.X, mousePos.Y)
+			if lastHoveredSlot and lastHoveredSlot ~= hSlotFrame then
+				local hStroke = lastHoveredSlot:FindFirstChild("SlotStroke")
+				if hStroke then hStroke.Thickness = 2 end
+			end
+			if hSlotFrame then
+				local hStroke = hSlotFrame:FindFirstChild("SlotStroke")
+				if hStroke then
+					hStroke.Color = COLORS.slotHighlight
+					hStroke.Thickness = 3
+				end
+				lastHoveredSlot = hSlotFrame
+			else
+				lastHoveredSlot = nil
+			end
+		end
+	end)
+
+	local endConn = UserInputService.InputEnded:Connect(function(endedInput)
+		if endedInput.UserInputType ~= Enum.UserInputType.MouseButton1
+			and endedInput.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		if isDragging then
+			local mousePos = Vector2.new(endedInput.Position.X, endedInput.Position.Y)
+			local locIdx, col, row, slotFrame = findSlotUnderPosition(mousePos.X, mousePos.Y)
+
+			if locIdx then
+				local loc = locations[locIdx]
+				local canPlay, restrictReason = LocationRestrictions.canPlayAt(loc, def, row)
+
+				local hasPending = false
+				for _, play in ipairs(pendingPlays) do
+					if play.locIdx == locIdx and play.col == col and play.row == row then
+						hasPending = true
+						break
+					end
+				end
+
+				if canPlay and not hasPending then
+					table.insert(pendingPlays, {
+						cardID = cardID,
+						locIdx = locIdx,
+						col = col,
+						row = row,
+						handIndex = cardIndex,
+					})
+					energySpent = energySpent + def.cost
+
+					print(string.format("[Client] Pending: %s at loc %d (%d,%d)", cardID, locIdx, col, row))
+
+					cleanupDrag()
+					renderMyBoard(lastMyBoards)
+					renderPendingPlays()
+					renderHand()
+					highlightValidSlots()
+					updateEnergyDisplay()
+					updatePowerTotals(lastMyBoards, lastOppBoards)
+					return
+				elseif not canPlay then
+					showToast(restrictReason)
+				elseif hasPending then
+					showToast("Slot already has a pending play")
+				end
+			end
+
+			-- Drop failed or missed — cancel drag
+			cleanupDrag()
+			renderHand()
+			highlightValidSlots()
+			updateEnergyDisplay()
+		else
+			-- Was just a click (no drag) — inspect the card
+			local cID = draggingCardID
+			cleanupDrag()
+			if cID then
+				showCardInspect(cID)
+			end
+		end
+	end)
+
+	table.insert(dragConnections, moveConn)
+	table.insert(dragConnections, endConn)
+end
+
+-- ============================================================
+-- Interaction Handlers
+-- ============================================================
+
+function onHandCardClicked(cardID, cardIndex)
+	if not matchActive or submitted then return end
+	showCardInspect(cardID)
+end
+
+function onSlotClicked(locIdx, col, row)
+	if not matchActive or submitted then return end
+	if draggingCardID then return end
+
+	-- Check if there's a pending play here — inspect with undo option
+	for _, play in ipairs(pendingPlays) do
+		if play.locIdx == locIdx and play.col == col and play.row == row then
+			showCardInspect(play.cardID, nil, play)
 			return
 		end
 	end
 
-	if not selectedCardID then return end
-
-	local def = CardDatabase[selectedCardID]
-	if not def then return end
-
-	-- Check location restrictions
-	local loc = locations[locIdx]
-	local canPlay, restrictReason = LocationRestrictions.canPlayAt(loc, def, row)
-	if not canPlay then
-		showToast(restrictReason)
-		return
+	-- Check if there's a committed card here — inspect it
+	if lastMyBoards then
+		local board = lastMyBoards[locIdx]
+		if board then
+			local cardState = board[1] and board[1][col]
+			if cardState then
+				local cardID = type(cardState) == "table" and cardState.cardID or cardState
+				local power = type(cardState) == "table" and cardState.currentPower or nil
+				showCardInspect(cardID, power)
+				return
+			end
+		end
 	end
-
-	table.insert(pendingPlays, {
-		cardID = selectedCardID,
-		locIdx = locIdx,
-		col = col,
-		row = row,
-		handIndex = selectedCardIndex,
-	})
-	energySpent = energySpent + def.cost
-
-	print(string.format("[Client] Pending: %s at loc %d (%d,%d)", selectedCardID, locIdx, col, row))
-
-	selectedCardID = nil
-	selectedCardIndex = nil
-
-	renderMyBoard(lastMyBoards)
-	renderPendingPlays()
-	renderHand()
-	highlightValidSlots()
-	updateEnergyDisplay()
-	updatePowerTotals(lastMyBoards, lastOppBoards)
 end
 
 function onOppSlotClicked(locIdx, col, row)
+	if draggingCardID then return end
 	-- Show detail overlay for opponent's card (Phase 5E)
 	if not lastOppBoards then return end
 	local board = lastOppBoards[locIdx]
