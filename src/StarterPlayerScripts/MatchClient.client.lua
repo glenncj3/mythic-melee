@@ -1730,6 +1730,11 @@ function showCardInspect(cardID, overridePower, pendingPlay)
 	local detailCard = CardFrame.create(cardID, "detail", overridePower)
 	if detailCard then
 		detailCard.ZIndex = 12
+		for _, desc in ipairs(detailCard:GetDescendants()) do
+			if desc:IsA("GuiObject") then
+				desc.ZIndex = desc.ZIndex + 9
+			end
+		end
 		detailCard.Parent = container
 	end
 
@@ -2044,6 +2049,11 @@ function onOppSlotClicked(locIdx, col, row)
 			local detailCard = CardFrame.create(cardID, "detail", power)
 			if detailCard then
 				detailCard.ZIndex = 12
+				for _, desc in ipairs(detailCard:GetDescendants()) do
+					if desc:IsA("GuiObject") then
+						desc.ZIndex = desc.ZIndex + 9
+					end
+				end
 				detailCard.Parent = container
 
 				-- Red-tinted border for opponent's card
