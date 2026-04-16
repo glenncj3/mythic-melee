@@ -2,14 +2,15 @@
 	CardFrame — shared card rendering component.
 
 	Creates GUI Frame elements for cards at three display sizes:
-		"board"  — fills parent slot (scale-based), art + badges only
-		"hand"   — fills parent slot (scale-based), art + badges + name + ability
-		"detail" — fixed 240x340 pixels, shows everything + stats
+		"board"  — fills parent slot, extended art + badges + name
+		"hand"   — fills parent slot, extended art + badges + name
+		"detail" — fixed 240x340 pixels, shows everything + stats + ability
 
-	Art: bright colored rectangle (top portion).
+	Board/hand: extended art fills card edge-to-edge (masked by rarity border),
+	dark gradient at bottom for name readability, no ability text or pip.
+	Detail (inspect): inset art, full ability text, ability pip, stats line.
 	Rarity borders: Common=white, Uncommon=green+glow, Rare=blue+glow, Legendary=gold+glow.
 	Badges: Cost (blue, top-left), Power (gold, top-right).
-	Ability pip: OnReveal=orange, Ongoing=teal (small dot).
 
 	IMPORTANT: All elements use ZIndex >= 3 because parent containers
 	may have ZIndex=2 and Roblox ZIndex is global within a ScreenGui.
@@ -84,7 +85,7 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	stroke.Thickness = RARITY_THICKNESS[def.rarity] or 2
 	stroke.Parent = frame
 
-	-- === ART AREA (top portion — bright colored rectangle with subtle gradient) ===
+	-- === ART AREA ===
 	local artFrame = Instance.new("Frame")
 	artFrame.Name = "Art"
 	-- White background so UIGradient colors render accurately
@@ -107,8 +108,33 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		artFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
 		artFrame.Size = UDim2.new(0.9, 0, 0.4, 0)
 	else
-		artFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
-		artFrame.Size = UDim2.new(0.9, 0, 0.5, 0)
+		-- Extended art: fills entire card up to the rarity border
+		artFrame.Position = UDim2.new(0, 0, 0, 0)
+		artFrame.Size = UDim2.new(1, 0, 1, 0)
+		artCorner.CornerRadius = UDim.new(0, 6)
+
+		-- Dark gradient at bottom for name readability over art
+		local nameBg = Instance.new("Frame")
+		nameBg.Name = "NameBg"
+		nameBg.Size = UDim2.new(1, 0, 0.35, 0)
+		nameBg.Position = UDim2.new(0, 0, 0.65, 0)
+		nameBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		nameBg.BorderSizePixel = 0
+		nameBg.ZIndex = 3
+		nameBg.Parent = frame
+
+		local nameBgCorner = Instance.new("UICorner")
+		nameBgCorner.CornerRadius = UDim.new(0, 6)
+		nameBgCorner.Parent = nameBg
+
+		local nameBgGradient = Instance.new("UIGradient")
+		nameBgGradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.3, 0.3),
+			NumberSequenceKeypoint.new(1, 0.1),
+		})
+		nameBgGradient.Rotation = 90
+		nameBgGradient.Parent = nameBg
 	end
 
 	-- === COST BADGE (blue circle, top-left) ===
@@ -171,8 +197,8 @@ function CardFrame.create(cardID, displaySize, overridePower)
 	powerLabel.ZIndex = 5
 	powerLabel.Parent = powerBadge
 
-	-- === ABILITY PIP (small colored dot below art) ===
-	if def.ability then
+	-- === ABILITY PIP (detail only — small colored dot below art) ===
+	if def.ability and displaySize == "detail" then
 		local parsed = string.split(def.ability, ":")
 		local trigger = parsed[1]
 		local pipColor = ABILITY_PIP_COLORS[trigger]
@@ -197,31 +223,34 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		end
 	end
 
-	-- === NAME LABEL (hand and detail) ===
-	if displaySize == "hand" or displaySize == "detail" then
+	-- === NAME LABEL (all sizes) ===
+	do
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Name = "NameLabel"
 		nameLabel.BackgroundTransparency = 1
 		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 		nameLabel.Font = Enum.Font.GothamBold
 		nameLabel.Text = def.name
-		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 		nameLabel.ZIndex = 4
 		nameLabel.Parent = frame
 
-		if displaySize == "hand" then
-			nameLabel.TextSize = 13
-			nameLabel.Position = UDim2.new(0.08, 0, 0.57, 0)
-			nameLabel.Size = UDim2.new(0.84, 0, 0.10, 0)
-		else
+		if displaySize == "detail" then
+			nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 			nameLabel.TextSize = 20
 			nameLabel.Position = UDim2.new(0.08, 0, 0.47, 0)
 			nameLabel.Size = UDim2.new(0.84, 0, 0.08, 0)
+		else
+			-- Board and hand: centered at bottom over dark gradient
+			nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+			nameLabel.TextScaled = true
+			nameLabel.Position = UDim2.new(0.06, 0, 0.80, 0)
+			nameLabel.Size = UDim2.new(0.88, 0, 0.16, 0)
+			nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 		end
 	end
 
-	-- === ABILITY TEXT (hand and detail) ===
-	if (displaySize == "hand" or displaySize == "detail") and def.abilityText then
+	-- === ABILITY TEXT (detail only) ===
+	if displaySize == "detail" and def.abilityText then
 		local abilityLabel = Instance.new("TextLabel")
 		abilityLabel.Name = "AbilityLabel"
 		abilityLabel.BackgroundTransparency = 1
@@ -234,16 +263,9 @@ function CardFrame.create(cardID, displaySize, overridePower)
 		abilityLabel.ZIndex = 4
 		abilityLabel.Parent = frame
 
-		if displaySize == "hand" then
-			abilityLabel.TextSize = 10
-			abilityLabel.Position = UDim2.new(0.08, 0, 0.68, 0)
-			abilityLabel.Size = UDim2.new(0.84, 0, 0.20, 0)
-			abilityLabel.TextTruncate = Enum.TextTruncate.AtEnd
-		else
-			abilityLabel.TextSize = 14
-			abilityLabel.Position = UDim2.new(0.08, 0, 0.57, 0)
-			abilityLabel.Size = UDim2.new(0.84, 0, 0.3, 0)
-		end
+		abilityLabel.TextSize = 14
+		abilityLabel.Position = UDim2.new(0.08, 0, 0.57, 0)
+		abilityLabel.Size = UDim2.new(0.84, 0, 0.3, 0)
 	end
 
 	-- === STATS LINE (detail only) ===
